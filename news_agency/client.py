@@ -4,54 +4,65 @@ import getpass
 # Base URL of your Django API
 API_BASE_URL = "http://127.0.0.1:8000/api/"
 
+session = requests.Session()
 current_user = {'is_logged_in': False, 'username': None, 'name': None}
 
 def login(api_url):
     global current_user
     username = input("Enter username: ")
     password = getpass.getpass("Enter password: ")
-    response = requests.post(api_url, data={'username': username, 'password': password})
+    response = session.post(api_url, data={'username': username, 'password': password})
     
     if response.status_code == 200:
-        # Assuming the response from the API includes 'name' on successful login
         user_data = response.json()
         current_user['is_logged_in'] = True
         current_user['username'] = username
-        current_user['name'] = user_data.get('name')  # Get the actual name from the response
+        current_user['name'] = user_data.get('name')
         print(f"Login successful. Welcome, {current_user['name']} ({username})!")
     else:
         print("Login failed:", response.text)
 
 def logout(api_base_url):
-    global current_user
+    global current_user, session
     if not current_user['is_logged_in']:
         print("No user is logged in.")
         return
-    url = f"{api_base_url}logout"
-    response = requests.post(url)
+    response = session.post(api_base_url + 'logout')
     if response.status_code == 200:
-        print(f"Logout successful for {current_user['username']}.")
-        current_user = {'is_logged_in': False, 'username': None}
+        print(f"Logout successful for {current_user['name']} ({current_user['username']}).")
+        current_user = {'is_logged_in': False, 'username': None, 'name': None}
+        session.cookies.clear()
     else:
         print("Logout failed:", response.text)
 
 def post_story():
-    url = f"{API_BASE_URL}stories"
+    global session
+    url = API_BASE_URL + "stories"
+    
+    # Retrieve the CSRF token from session cookies
+    csrf_token = session.cookies.get('csrftoken')
+
     headline = input("Enter headline: ")
     category = input("Enter category: ")
     region = input("Enter region: ")
     details = input("Enter details: ")
-    response = requests.post(url, json={
+
+    # Include CSRF token in request headers
+    headers = {'X-CSRFToken': csrf_token} if csrf_token else {}
+
+    response = session.post(url, json={
         'headline': headline, 
         'category': category, 
         'region': region, 
         'details': details
-    })
+    }, headers=headers)
+
     if response.status_code == 201:
         print("Story posted successfully.")
     else:
         print("Failed to post story:", response.text)
 
+        
 def main():
     while True:
         if current_user['is_logged_in']:

@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from .models import NewsStory, Author
 from .serializers import NewsStorySerializer, AuthorSerializer
 from django.http import HttpResponse
+from datetime import date
 
 def root_view(request):
     return HttpResponse("Welcome to the News Agency API.")
@@ -33,7 +34,6 @@ def login_view(request):
         return Response({"message": "Login failed. Please check username and password."},
                         status=status.HTTP_401_UNAUTHORIZED)
 
-        
 #Log Out
 @api_view(['POST'])
 def logout_view(request):
@@ -44,14 +44,25 @@ def logout_view(request):
 @api_view(['POST'])
 def post_story(request):
     if request.user.is_authenticated:
-        serializer = NewsStorySerializer(data=request.data)
+        data = request.data.copy()
+        data['date'] = date.today().isoformat()
+
+        try:
+            author_instance = Author.objects.get(username=request.user.username)
+        except Author.DoesNotExist:
+            return Response({"message": "Author not found."},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        serializer = NewsStorySerializer(data=data)
         if serializer.is_valid():
-            serializer.save(author=request.user)
+            serializer.save(author=author_instance)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     else:
         return Response({"message": "User not authenticated."},
                         status=status.HTTP_401_UNAUTHORIZED)
+
 
 #Get Stories
 @api_view(['GET'])
