@@ -41,7 +41,8 @@ def post_story():
 def main():
     while True:
         command = input("Enter command (login, logout, post, exit): ")
-        if command == 'login':
+        command_parts = command.split()
+        if command_parts[0] == 'login' and len(command_parts) == 2:
             login()
         elif command == 'logout':
             logout()
@@ -54,3 +55,13 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+"""
+Improvements:
+
+- Client application does does not show show who has logged in nor it differentiates who has logged in. For example, it doesn't know 
+if an author has logged in or if a superuser has logged in.
+- "Enter command (login, logout, post, exit):" Command and the arguments are not informative enough. You should refer to the project
+specification more more closely.
+
+"""
