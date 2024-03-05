@@ -5,7 +5,7 @@ from django.contrib.auth import authenticate, login, logout
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .models import NewsStory
+from .models import NewsStory, Author
 from .serializers import NewsStorySerializer, AuthorSerializer
 from django.http import HttpResponse
 
@@ -20,11 +20,20 @@ def login_view(request):
     user = authenticate(request, username=username, password=password)
     if user is not None:
         login(request, user)
-        return Response({"message": "Welcome, you are now logged in."}, status=status.HTTP_200_OK)
+        try:
+            author = Author.objects.get(username=username)
+            author_name = author.name
+        except Author.DoesNotExist:
+            author_name = None
+        return Response({
+            "username": username,
+            "name": author_name  # Now you return the author's name
+        }, status=status.HTTP_200_OK)
     else:
         return Response({"message": "Login failed. Please check username and password."},
                         status=status.HTTP_401_UNAUTHORIZED)
 
+        
 #Log Out
 @api_view(['POST'])
 def logout_view(request):

@@ -1,23 +1,37 @@
 import requests
+import getpass
 
 # Base URL of your Django API
 API_BASE_URL = "http://127.0.0.1:8000/api/"
 
-def login():
-    url = f"{API_BASE_URL}login"
+current_user = {'is_logged_in': False, 'username': None, 'name': None}
+
+def login(api_url):
+    global current_user
     username = input("Enter username: ")
-    password = input("Enter password: ")
-    response = requests.post(url, data={'username': username, 'password': password})
+    password = getpass.getpass("Enter password: ")
+    response = requests.post(api_url, data={'username': username, 'password': password})
+    
     if response.status_code == 200:
-        print("Login successful.")
+        # Assuming the response from the API includes 'name' on successful login
+        user_data = response.json()
+        current_user['is_logged_in'] = True
+        current_user['username'] = username
+        current_user['name'] = user_data.get('name')  # Get the actual name from the response
+        print(f"Login successful. Welcome, {current_user['name']} ({username})!")
     else:
         print("Login failed:", response.text)
 
-def logout():
-    url = f"{API_BASE_URL}logout"
+def logout(api_base_url):
+    global current_user
+    if not current_user['is_logged_in']:
+        print("No user is logged in.")
+        return
+    url = f"{api_base_url}logout"
     response = requests.post(url)
     if response.status_code == 200:
-        print("Logout successful.")
+        print(f"Logout successful for {current_user['username']}.")
+        current_user = {'is_logged_in': False, 'username': None}
     else:
         print("Logout failed:", response.text)
 
@@ -40,15 +54,20 @@ def post_story():
 
 def main():
     while True:
-        command = input("Enter command (login, logout, post, exit): ")
+        if current_user['is_logged_in']:
+            print(f"\nLogged in as: {current_user['name']} ({current_user['username']})")
+        else:
+            print("\nPlease log in!")
+            
+        command = input("\nEnter command: \n  - To login: 'login <API URL>'\n  - To logout: 'logout'\n  - To post a story: 'post'\n  - To exit: 'exit'\nCommand: ")
         command_parts = command.split()
         if command_parts[0] == 'login' and len(command_parts) == 2:
-            login()
-        elif command == 'logout':
-            logout()
-        elif command == 'post':
+            login(command_parts[1])
+        elif command_parts[0] == 'logout':
+            logout(API_BASE_URL)
+        elif command_parts[0] == 'post':
             post_story()
-        elif command == 'exit':
+        elif command_parts[0] == 'exit':
             break
         else:
             print("Unknown command.")
@@ -56,12 +75,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-"""
-Improvements:
-
-- Client application does does not show show who has logged in nor it differentiates who has logged in. For example, it doesn't know 
-if an author has logged in or if a superuser has logged in.
-- "Enter command (login, logout, post, exit):" Command and the arguments are not informative enough. You should refer to the project
-specification more more closely.
-
-"""
