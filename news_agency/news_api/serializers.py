@@ -24,11 +24,14 @@ class AuthorSerializer(serializers.ModelSerializer):
         return instance
 
 class NewsStorySerializer(serializers.ModelSerializer):
-    author = serializers.StringRelatedField(read_only=True)
+    author_name = serializers.SerializerMethodField()
 
     class Meta:
         model = NewsStory
-        fields = ['id', 'headline', 'category', 'region', 'author', 'date', 'details']
+        fields = ['id', 'headline', 'category', 'region', 'author_name', 'date', 'details']
+
+    def get_author_name(self, obj):
+        return obj.author.name if obj.author else None
 
 """
 In this implementation:

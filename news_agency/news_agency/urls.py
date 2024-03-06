@@ -22,8 +22,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path('api/login', views.login_view),
     path('api/logout', views.logout_view),
-    path('api/stories', views.post_story, name='post_story'),
-    path('api/stories', views.get_stories, name='get_stories'),
+    path('api/stories', views.stories_view, name='stories'),
     path('api/stories/<int:pk>', views.delete_story, name='delete_story'),
     path('', views.root_view),  # Add this line for the root view,
 ]
