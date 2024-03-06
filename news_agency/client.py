@@ -60,7 +60,25 @@ def post_story():
     if response.status_code == 201:
         print("Story posted successfully.")
     else:
-        print("Failed to post story:", response.text)
+        error_message = response.json()
+        formatted_errors = []
+
+        # Iterate through the errors and create a user-friendly message
+        for field, messages in error_message.items():
+            # For fields with choices like 'category' and 'region', provide the valid choices
+            if field in ['category', 'region']:
+                valid_choices = {
+                    'category': ['pol', 'art', 'tech', 'trivia'],
+                    'region': ['uk', 'eu', 'w']
+                }
+                formatted_errors.append(f"{field.capitalize()} error: {', '.join(messages)}. Valid choices are: {', '.join(valid_choices[field])}.")
+            else:
+                # Generic error formatting for other fields
+                formatted_errors.append(f"{field.capitalize()} error: {', '.join(messages)}.")
+
+        # Join all the error messages into one string and print it
+        print("Failed to post story due to the following errors:")
+        print("\n".join(formatted_errors))
 
         
 def main():
