@@ -122,14 +122,17 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     response = session.get(url, params=params)
     if response.status_code == 200:
         stories = response.json()
-        for story in stories:
-            print(f"ID: {story['id']}")
-            print(f"Headline: {story['headline']}")
-            print(f"Category: {story['full_category']}")
-            print(f"Region: {story['full_region']}")
-            print(f"Author: {story.get('author_name', 'N/A')}")
-            print(f"Date: {story['date']}")
-            print(f"Details: {story['details']}\n")
+        if not stories:
+            print("No news stories found with the specified criteria.")
+        else:
+            for story in stories:
+                print(f"ID: {story['id']}")
+                print(f"Headline: {story['headline']}")
+                print(f"Category: {story['full_category']}")
+                print(f"Region: {story['full_region']}")
+                print(f"Author: {story.get('author_name', 'N/A')}")
+                print(f"Date: {story['date']}")
+                print(f"Details: {story['details']}\n")
     else:
         print("Failed to get news:", response.text)
         
