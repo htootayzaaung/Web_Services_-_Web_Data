@@ -67,9 +67,9 @@ def stories_view(request):
 
     elif request.method == 'GET':
         story_id = request.query_params.get('id')
-        story_cat = request.query_params.get('story_cat', '*')
-        story_region = request.query_params.get('story_region', '*')
-        story_date = request.query_params.get('story_date', '*')
+        story_cat = request.query_params.get('category', '*')
+        story_region = request.query_params.get('region', '*')
+        story_date = request.query_params.get('date', '*')
 
         stories = NewsStory.objects.all()
         if story_id:
@@ -80,7 +80,6 @@ def stories_view(request):
             stories = stories.filter(region=story_region)
         if story_date != '*':
             try:
-                # Adjust the parsing to use ISO format ('yyyy-mm-dd')
                 story_date = datetime.datetime.strptime(story_date, "%Y-%m-%d").date()
                 stories = stories.filter(date__gte=story_date)
             except ValueError:
@@ -89,7 +88,7 @@ def stories_view(request):
 
         serializer = NewsStorySerializer(stories, many=True)
         return Response(serializer.data)
-
+    
 #Delete Story
 @api_view(['DELETE'])
 def delete_story(request, pk):

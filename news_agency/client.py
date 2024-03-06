@@ -85,36 +85,48 @@ def post_story():
 
 def parse_news_args(args):
     switches = {"id": None, "category": "*", "region": "*", "news_date": "*"}
+    has_errors = False
+    
     for arg in args:
-        if "=" in arg:
-            key, value = arg.split("=", 1)
-            key = key.lstrip('-')
-            value = value.strip('”“"')  # Strip quotes from the value
+        if "=" not in arg:
+            print(f"Invalid command format: {arg}. Expected format is -key=value.")
+            has_errors = True
+            continue
 
-            if key == 'cat':
-                switches['category'] = value
-            elif key == 'reg':
-                switches['region'] = value
-            elif key == 'date':
-                switches['news_date'] = value
-            elif key == 'id':
-                switches['id'] = value
+        key, value = arg.split("=", 1)
+        key = key.lstrip('-')
+        value = value.strip('”“"') 
 
-    return switches
+        if value == "":
+            continue
+
+        if key in ['cat', 'category']:
+            switches['category'] = value
+        elif key in ['reg', 'region']:
+            switches['region'] = value
+        elif key in ['date', 'news_date']:
+            switches['news_date'] = value
+        elif key == 'id':
+            switches['id'] = value
+        else:
+            print(f"Invalid command key: {key}")
+
+    return switches, has_errors
+
 
 def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     url = f"{API_BASE_URL}stories"
     params = {}
-    if id:
-        params['id'] = id  # Now expecting 'id' instead of 'news_id'
-    if category != "*":
-        params['story_cat'] = category
-    if region != "*":
-        params['story_region'] = region
-    if news_date != "*":
+    if id and id.strip():
+        params['id'] = id.strip()
+    if category and category != "*":
+        params['category'] = category.strip()
+    if region and region != "*":
+        params['region'] = region.strip()
+    if news_date and news_date != "*":
         try:
-            news_date = datetime.datetime.strptime(news_date, "%d/%m/%Y").date()
-            params['story_date'] = news_date.isoformat()
+            parsed_date = datetime.datetime.strptime(news_date, "%d/%m/%Y").date()
+            params['date'] = parsed_date.isoformat()
         except ValueError:
             print("Invalid date format. Please enter the date in 'dd/mm/yyyy' format.")
             return
@@ -157,8 +169,13 @@ def main():
                 "      -date: the date for stories (format: 'dd/mm/yyyy'). Assumes '*' if omitted.\n"
                 "  - To exit: 'exit'\n"
                 "Command: ")
-        command_parts = shlex.split(command)
-        
+
+        try:
+            command_parts = shlex.split(command)
+        except ValueError as e:
+            print("Error in command format:", e)
+            continue
+
         if not command_parts:
             print("No command entered.")
             continue
@@ -168,9 +185,10 @@ def main():
             logout(API_BASE_URL)
         elif command_parts[0] == 'post':
             post_story()
-        elif command_parts[0] == 'news':
-            news_args = parse_news_args(command_parts[1:])
-            get_news_from_service(**news_args)
+        if command_parts[0] == 'news':
+            news_args, has_errors = parse_news_args(command_parts[1:])
+            if not has_errors:
+                get_news_from_service(**news_args)
         elif command_parts[0] == 'exit':
             break
         else:
