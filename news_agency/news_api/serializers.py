@@ -24,14 +24,20 @@ class AuthorSerializer(serializers.ModelSerializer):
         return instance
 
 class NewsStorySerializer(serializers.ModelSerializer):
-    author_name = serializers.SerializerMethodField()
-
+    full_category = serializers.SerializerMethodField()
+    full_region = serializers.SerializerMethodField()
+    author_name = serializers.CharField(source='author.name', read_only=True)
+    
     class Meta:
         model = NewsStory
-        fields = ['id', 'headline', 'category', 'region', 'author_name', 'date', 'details']
+        fields = ['id', 'headline', 'full_category', 'full_region', 'author_name', 'date', 'details']
+    
+    def get_full_category(self, obj):
+        return dict(NewsStory.CATEGORY_CHOICES).get(obj.category, obj.category)
 
-    def get_author_name(self, obj):
-        return obj.author.name if obj.author else None
+    def get_full_region(self, obj):
+        return dict(NewsStory.REGION_CHOICES).get(obj.region, obj.region)
+
 
 """
 In this implementation:

@@ -2,6 +2,7 @@ import requests
 import getpass
 import sys
 import datetime
+import shlex
 
 # Base URL of your Django API
 API_BASE_URL = "http://127.0.0.1:8000/api/"
@@ -83,38 +84,37 @@ def post_story():
         print("\n".join(formatted_errors))
 
 def parse_news_args(args):
-    switches = {"category": "*", "region": "*", "news_date": "*"}
+    switches = {"id": None, "category": "*", "region": "*", "news_date": "*"}
     for arg in args:
         if "=" in arg:
             key, value = arg.split("=", 1)
             key = key.lstrip('-')
-            # Map command line args to function kwargs
+            value = value.strip('”“"')  # Strip quotes from the value
+
             if key == 'cat':
-                key = 'category'
+                switches['category'] = value
             elif key == 'reg':
-                key = 'region'
+                switches['region'] = value
             elif key == 'date':
-                key = 'news_date'
-            if key in switches:
-                switches[key] = value.strip('”“')
+                switches['news_date'] = value
+            elif key == 'id':
+                switches['id'] = value
+
     return switches
 
-
-def get_news_from_service(news_id=None, category="*", region="*", news_date="*"):
-    # Construct the URL with optional parameters
+def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     url = f"{API_BASE_URL}stories"
     params = {}
-    if news_id:
-        params['id'] = news_id
+    if id:
+        params['id'] = id  # Now expecting 'id' instead of 'news_id'
     if category != "*":
-        params['cat'] = category
+        params['story_cat'] = category
     if region != "*":
-        params['reg'] = region
+        params['story_region'] = region
     if news_date != "*":
-        # Convert the date to the API's expected format
         try:
             news_date = datetime.datetime.strptime(news_date, "%d/%m/%Y").date()
-            params['date'] = news_date.isoformat()
+            params['story_date'] = news_date.isoformat()
         except ValueError:
             print("Invalid date format. Please enter the date in 'dd/mm/yyyy' format.")
             return
@@ -125,8 +125,8 @@ def get_news_from_service(news_id=None, category="*", region="*", news_date="*")
         for story in stories:
             print(f"ID: {story['id']}")
             print(f"Headline: {story['headline']}")
-            print(f"Category: {story['category']}")
-            print(f"Region: {story['region']}")
+            print(f"Category: {story['full_category']}")
+            print(f"Region: {story['full_region']}")
             print(f"Author: {story.get('author_name', 'N/A')}")
             print(f"Date: {story['date']}")
             print(f"Details: {story['details']}\n")
@@ -147,13 +147,14 @@ def main():
                 "  - To get news: 'news [-id=] [-cat=] [-reg=] [-date=]' (e.g., 'news -cat=tech -reg=uk')\n"
                 "    where [-id], [cat], [reg], and [date] are optional switches that have the following effects:\n"
                 "      -id: the id of the news service. Collects from all if omitted.\n"
-                "      -cat: the news category (e.g., 'tech'). Assumes '*' if omitted.\n"
-                "      -reg: the region of the stories (e.g., 'uk'). Assumes '*' if omitted.\n"
+                "      -cat: the news category from the following: pol (for politics), art, tech (for technology), or trivia (for trivial)\n"
+                "            Assumes '*' if omitted.\n"
+                "      -reg: the region for the news from the following: uk (for United Kingdom), eu (for European), or w (for World).\n"
+                "            Assumes '*' if omitted.\n"
                 "      -date: the date for stories (format: 'dd/mm/yyyy'). Assumes '*' if omitted.\n"
                 "  - To exit: 'exit'\n"
                 "Command: ")
-        command_parts = command.split()
-        args = command_parts[1:]
+        command_parts = shlex.split(command)
         
         if not command_parts:
             print("No command entered.")
@@ -165,7 +166,7 @@ def main():
         elif command_parts[0] == 'post':
             post_story()
         elif command_parts[0] == 'news':
-            news_args = parse_news_args(args)
+            news_args = parse_news_args(command_parts[1:])
             get_news_from_service(**news_args)
         elif command_parts[0] == 'exit':
             break
