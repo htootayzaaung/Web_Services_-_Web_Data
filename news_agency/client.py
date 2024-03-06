@@ -84,35 +84,39 @@ def post_story():
         print("\n".join(formatted_errors))
 
 def parse_news_args(args):
+    valid_keys = {'id', 'cat', 'reg', 'date'}
     switches = {"id": None, "category": "*", "region": "*", "news_date": "*"}
-    has_errors = False
-    
+    invalid_keyword_found = False
+    format_error_found = False
+
     for arg in args:
         if "=" not in arg:
             print(f"Invalid command format: {arg}. Expected format is -key=value.")
-            has_errors = True
+            format_error_found = True
             continue
 
         key, value = arg.split("=", 1)
-        key = key.lstrip('-')
-        value = value.strip('”“"') 
+        key = key.lstrip('-').strip('”“"')
 
+        if key not in valid_keys:
+            print(f"Invalid command keyword: {key}")
+            invalid_keyword_found = True
+            continue
+
+        value = value.strip('”“"')
         if value == "":
             continue
 
-        if key in ['cat', 'category']:
+        if key == 'cat':
             switches['category'] = value
-        elif key in ['reg', 'region']:
+        elif key == 'reg':
             switches['region'] = value
-        elif key in ['date', 'news_date']:
+        elif key == 'date':
             switches['news_date'] = value
         elif key == 'id':
             switches['id'] = value
-        else:
-            print(f"Invalid command key: {key}")
 
-    return switches, has_errors
-
+    return switches, invalid_keyword_found, format_error_found
 
 def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     url = f"{API_BASE_URL}stories"
@@ -185,10 +189,12 @@ def main():
             logout(API_BASE_URL)
         elif command_parts[0] == 'post':
             post_story()
-        if command_parts[0] == 'news':
-            news_args, has_errors = parse_news_args(command_parts[1:])
-            if not has_errors:
+        elif command_parts[0] == 'news':
+            news_args, invalid_keyword_found, format_error_found = parse_news_args(command_parts[1:])
+            if not invalid_keyword_found and not format_error_found:
                 get_news_from_service(**news_args)
+            else:
+                print("Command not executed due to invalid keyword or format error.")
         elif command_parts[0] == 'exit':
             break
         else:
