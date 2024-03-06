@@ -39,24 +39,43 @@ def logout(api_base_url):
         print("Logout failed:", response.text)
 
 def post_story():
-    global session
-    url = API_BASE_URL + "stories"
-    
-    # Retrieve the CSRF token from session cookies
-    csrf_token = session.cookies.get('csrftoken')
+    global current_user, session
+    valid_categories = ['pol', 'art', 'tech', 'trivia']
+    valid_regions = ['uk', 'eu', 'w']
 
+    # Check if the user is logged in
+    if not current_user['is_logged_in']:
+        print("You must be logged in to post a story.")
+        return
+    
+    # Prompt for story details
     headline = input("Enter headline: ")
     category = input("Enter category: ")
     region = input("Enter region: ")
     details = input("Enter details: ")
 
+    # Validation for category and region
+    if category not in valid_categories:
+        print(f"Invalid category. Valid categories are: {', '.join(valid_categories)}.")
+        return
+    if region not in valid_regions:
+        print(f"Invalid region. Valid regions are: {', '.join(valid_regions)}.")
+        return
+
+    url = API_BASE_URL + "stories"
+    
+    # Retrieve the CSRF token from session cookies
+    csrf_token = session.cookies.get('csrftoken')
+
     # Include CSRF token in request headers
     headers = {'X-CSRFToken': csrf_token} if csrf_token else {}
+    
+    print(f"Debug: Headline - {headline}, Category - {category}, Region - {region}")
 
     response = session.post(url, json={
         'headline': headline, 
-        'category': category, 
-        'region': region, 
+        'category': category.lower(), 
+        'region': region.lower(), 
         'details': details
     }, headers=headers)
 

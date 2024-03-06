@@ -24,20 +24,20 @@ class AuthorSerializer(serializers.ModelSerializer):
         return instance
 
 class NewsStorySerializer(serializers.ModelSerializer):
-    full_category = serializers.SerializerMethodField()
-    full_region = serializers.SerializerMethodField()
+    category = serializers.ChoiceField(choices=NewsStory.CATEGORY_CHOICES)
+    region = serializers.ChoiceField(choices=NewsStory.REGION_CHOICES)
     author_name = serializers.CharField(source='author.name', read_only=True)
-    
+
     class Meta:
         model = NewsStory
-        fields = ['id', 'headline', 'full_category', 'full_region', 'author_name', 'date', 'details']
-    
-    def get_full_category(self, obj):
-        return dict(NewsStory.CATEGORY_CHOICES).get(obj.category, obj.category)
+        fields = ['id', 'headline', 'category', 'region', 'author_name', 'date', 'details']
 
-    def get_full_region(self, obj):
-        return dict(NewsStory.REGION_CHOICES).get(obj.region, obj.region)
-
+    def to_representation(self, instance):
+        """Convert `category` and `region` codes to full name for the API response."""
+        ret = super().to_representation(instance)
+        ret['full_category'] = dict(NewsStory.CATEGORY_CHOICES).get(instance.category, "Unknown Category")
+        ret['full_region'] = dict(NewsStory.REGION_CHOICES).get(instance.region, "Unknown Region")
+        return ret
 
 """
 In this implementation:

@@ -47,7 +47,8 @@ def stories_view(request):
     if request.method == 'POST':
         if request.user.is_authenticated:
             data = request.data.copy()
-            data['date'] = date.today().isoformat()
+            # Set the date to today if it's not provided
+            data.setdefault('date', date.today().isoformat())
 
             try:
                 author_instance = Author.objects.get(username=request.user.username)
@@ -64,7 +65,7 @@ def stories_view(request):
         else:
             return Response({"message": "User not authenticated."},
                             status=status.HTTP_401_UNAUTHORIZED)
-
+            
     elif request.method == 'GET':
         story_id = request.query_params.get('id')
         story_cat = request.query_params.get('category', '*')
