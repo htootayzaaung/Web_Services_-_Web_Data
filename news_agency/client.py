@@ -170,7 +170,29 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
                 print(f"Details: {story['details']}\n")
     else:
         print("Failed to get news:", response.text)
-        
+
+def delete_story(story_id):
+    global current_user, session
+
+    if not current_user['is_logged_in']:
+        print("You must be logged in to delete a story.")
+        return
+
+    url = API_BASE_URL + f"stories/{story_id}"
+
+    # Retrieve CSRF token from session cookies
+    csrf_token = session.cookies.get('csrftoken')
+
+    # Include CSRF token in request headers
+    headers = {'X-CSRFToken': csrf_token} if csrf_token else {}
+
+    response = session.delete(url, headers=headers)
+
+    if response.status_code == 200:
+        print("Story deleted successfully.")
+    else:
+        print("Failed to delete the story:", response.text)
+
 def main():
     while True:
         if current_user['is_logged_in']:
@@ -190,6 +212,7 @@ def main():
                 "      -reg: the region for the news from the following: uk (for United Kingdom), eu (for European), or w (for World).\n"
                 "            Assumes '*' if omitted.\n"
                 "      -date: the date for stories (format: 'dd/mm/yyyy'). Assumes '*' if omitted.\n"
+                "  - To delete a story: 'delete <story_id>'\n"
                 "  - To exit: 'exit'\n"
                 "Command: ")
 
@@ -214,6 +237,9 @@ def main():
                 get_news_from_service(**news_args)
             else:
                 print("Command not executed due to invalid keyword or format error.")
+        elif command_parts[0] == 'delete' and len(command_parts) == 2:
+            story_id = command_parts[1]
+            delete_story(story_id)
         elif command_parts[0] == 'exit':
             break
         else:

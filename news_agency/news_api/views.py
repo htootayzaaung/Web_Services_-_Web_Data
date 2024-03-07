@@ -90,17 +90,21 @@ def stories_view(request):
         serializer = NewsStorySerializer(stories, many=True)
         return Response(serializer.data)
     
-#Delete Story
 @api_view(['DELETE'])
 def delete_story(request, pk):
     try:
         story = NewsStory.objects.get(pk=pk)
-        if request.user.is_authenticated and story.author == request.user:
-            story.delete()
-            return Response({"message": "Story deleted successfully."},
-                            status=status.HTTP_200_OK)
+        if request.user.is_authenticated:
+            # Check if the logged-in user is the author of the story
+            if story.author.username == request.user.username:
+                story.delete()
+                return Response({"message": "Story deleted successfully."},
+                                status=status.HTTP_200_OK)
+            else:
+                return Response({"message": "Unauthorized to delete this story."},
+                                status=status.HTTP_403_FORBIDDEN)
         else:
-            return Response({"message": "Unauthorized to delete this story."},
+            return Response({"message": "User not authenticated."},
                             status=status.HTTP_401_UNAUTHORIZED)
     except NewsStory.DoesNotExist:
         return Response({"message": "Story not found."},
