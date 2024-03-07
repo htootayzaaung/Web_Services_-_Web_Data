@@ -23,14 +23,21 @@ def login(api_url):
         current_user['name'] = user_data.get('name')
         print(f"Login successful. Welcome, {current_user['name']} ({username})!")
     else:
-        print("Login failed:", response.text)
+        print("Login failed. Please check username and password.")
 
 def logout(api_base_url):
     global current_user, session
     if not current_user['is_logged_in']:
         print("No user is logged in.")
         return
-    response = session.post(api_base_url + 'logout')
+    
+    # Retrieve CSRF token from session cookies
+    csrf_token = session.cookies.get('csrftoken')
+
+    # Include CSRF token in request headers
+    headers = {'X-CSRFToken': csrf_token} if csrf_token else {}
+
+    response = session.post(api_base_url + 'logout', headers=headers)
     if response.status_code == 200:
         print(f"Logout successful for {current_user['name']} ({current_user['username']}).")
         current_user = {'is_logged_in': False, 'username': None, 'name': None}
@@ -237,9 +244,12 @@ def main():
                 get_news_from_service(**news_args)
             else:
                 print("Command not executed due to invalid keyword or format error.")
-        elif command_parts[0] == 'delete' and len(command_parts) == 2:
-            story_id = command_parts[1]
-            delete_story(story_id)
+        elif command_parts[0] == 'delete':
+            if len(command_parts) == 2:
+                story_id = command_parts[1]
+                delete_story(story_id)
+            else:
+                print("Invalid command format. Expected format is 'delete <story_id>'.")
         elif command_parts[0] == 'exit':
             break
         else:
