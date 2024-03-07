@@ -168,13 +168,13 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
             print("No news stories found with the specified criteria.")
         else:
             for story in stories:
-                print(f"ID: {story['id']}")
-                print(f"Headline: {story['headline']}")
-                print(f"Category: {story['full_category']}")
-                print(f"Region: {story['full_region']}")
-                print(f"Author: {story.get('author_name', 'N/A')}")
-                print(f"Date: {story['date']}")
-                print(f"Details: {story['details']}\n")
+                print(f"├── ID: {story['id']}")
+                print(f"├── Headline: {story['headline']}")
+                print(f"├── Category: {story['full_category']}")
+                print(f"├── Region: {story['full_region']}")
+                print(f"├── Author: {story.get('author_name', 'N/A')}")
+                print(f"├── Date: {story['date']}")
+                print(f"└── Details: {story['details']}\n")
     else:
         print("Failed to get news:", response.text)
 
@@ -200,6 +200,17 @@ def delete_story(story_id):
     else:
         print("Failed to delete the story:", response.text)
 
+def list_agencies():
+    url = "http://newssites.pythonanywhere.com/api/directory/"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        agencies = response.json()  # Expecting a direct list here
+        for agency in agencies:
+            print(f"├── Name: {agency['agency_name']}\n├── URL: {agency['url']}\n└── Code: {agency['agency_code']}\n")
+    else:
+        print(f"Failed to list agencies: {response.text}")
+        
 def main():
     while True:
         if current_user['is_logged_in']:
@@ -221,6 +232,7 @@ def main():
                 "      -date: the date for stories (format: 'dd/mm/yyyy'). Assumes '*' if omitted.\n"
                 "  - To delete a story: 'delete <story_id>'\n"
                 "  - To exit: 'exit'\n"
+                "  - To list agencies: 'list'\n"
                 "Command: ")
 
         try:
@@ -250,6 +262,8 @@ def main():
                 delete_story(story_id)
             else:
                 print("Invalid command format. Expected format is 'delete <story_id>'.")
+        elif command_parts[0] == 'list':
+            list_agencies()
         elif command_parts[0] == 'exit':
             break
         else:
