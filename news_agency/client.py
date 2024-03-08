@@ -145,7 +145,7 @@ def parse_news_args(args):
     return switches, invalid_keyword_found, format_error_found
 
 def get_news_from_service(id=None, category="*", region="*", news_date="*"):
-    url = f"{API_BASE_URL}stories"
+    url = f"http://sc21h2a.pythonanywhere.com/api/stories"
     params = {}
     if id and id.strip():
         params['id'] = id.strip()
@@ -164,6 +164,8 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     response = session.get(url, params=params)
     if response.status_code == 200:
         stories = response.json()
+        print(stories)
+        """
         if not stories:
             print("No news stories found with the specified criteria.")
         else:
@@ -175,6 +177,7 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
                 print(f"├── Author: {story.get('author_name', 'N/A')}")
                 print(f"├── Date: {story['date']}")
                 print(f"└── Details: {story['details']}\n")
+        """
     else:
         print("Failed to get news:", response.text)
 
