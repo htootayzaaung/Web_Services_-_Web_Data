@@ -24,6 +24,7 @@ class AuthorSerializer(serializers.ModelSerializer):
         return instance
 
 class NewsStorySerializer(serializers.ModelSerializer):
+    key = serializers.IntegerField(source='id', read_only=True)
     story_cat = serializers.CharField(source='category')
     story_region = serializers.CharField(source='region')
     author = serializers.CharField(source='author.name')
@@ -32,7 +33,8 @@ class NewsStorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = NewsStory
-        fields = ['id', 'headline', 'story_cat', 'story_region', 'author', 'story_date', 'story_details']
+        fields = ['key', 'headline', 'story_cat', 'story_region', 'author', 'story_date', 'story_details']
+
 
 """
 In this implementation:
