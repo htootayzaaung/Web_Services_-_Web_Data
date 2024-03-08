@@ -88,7 +88,7 @@ def stories_view(request):
                                 status=status.HTTP_400_BAD_REQUEST)
 
         serializer = NewsStorySerializer(stories, many=True)
-        return Response(serializer.data)
+        return Response({'stories': serializer.data})
     
 @api_view(['DELETE'])
 def delete_story(request, pk):
