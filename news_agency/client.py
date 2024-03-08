@@ -145,41 +145,57 @@ def parse_news_args(args):
     return switches, invalid_keyword_found, format_error_found
 
 def get_news_from_service(id=None, category="*", region="*", news_date="*"):
-    url = f"http://sc21h2a.pythonanywhere.com/api/stories"
-    params = {}
-    if id and id.strip():
-        params['id'] = id.strip()
-    if category and category != "*":
-        params['category'] = category.strip()
-    if region and region != "*":
-        params['region'] = region.strip()
-    if news_date and news_date != "*":
-        try:
-            parsed_date = datetime.datetime.strptime(news_date, "%d/%m/%Y").date()
-            params['date'] = parsed_date.isoformat()
-        except ValueError:
-            print("Invalid date format. Please enter the date in 'dd/mm/yyyy' format.")
-            return
-
-    response = session.get(url, params=params)
+    # Create an empty array to store all the url that has ".pythonanywhere.com" in it
+    pythonanywhere_urls = ["http://127.0.0.1:8000/api/stories"]
+    
+    url = "http://newssites.pythonanywhere.com/api/directory/"
+    response = requests.get(url)
     if response.status_code == 200:
-        stories = response.json()
-        print(stories)
-        """
-        if not stories:
-            print("No news stories found with the specified criteria.")
-        else:
-            for story in stories:
-                print(f"├── ID: {story['id']}")
-                print(f"├── Headline: {story['headline']}")
-                print(f"├── Category: {story['full_category']}")
-                print(f"├── Region: {story['full_region']}")
-                print(f"├── Author: {story.get('author_name', 'N/A')}")
-                print(f"├── Date: {story['date']}")
-                print(f"└── Details: {story['details']}\n")
-        """
-    else:
-        print("Failed to get news:", response.text)
+        agencies = response.json()  # Expecting a direct list here
+        for agency in agencies:
+            # append all the agency['url'] that has ".pythonanywhere.com" in it and get rid of the last "/"
+            if ".pythonanywhere.com" in agency['url']:
+                full_url = agency['url'].rstrip("/") + "/api/stories"
+                pythonanywhere_urls.append(full_url)
+                
+                
+    session = requests.Session()
+    # for each url in the array pythonanywhere_urls, get the news
+    for url in pythonanywhere_urls:
+        params = {}
+        if id and id.strip():
+            params['id'] = id.strip()
+        if category and category != "*":
+            params['category'] = category.strip()
+        if region and region != "*":
+            params['region'] = region.strip()
+        if news_date and news_date != "*":
+            try:
+                parsed_date = datetime.datetime.strptime(news_date, "%d/%m/%Y").date()
+                params['date'] = parsed_date.isoformat()
+            except ValueError:
+                print("Invalid date format. Please enter the date in 'dd/mm/yyyy' format.")
+                return
+
+        response = session.get(url, params=params)
+        if response.status_code == 200:
+            stories = response.json()
+            print(stories, "\n")
+            """
+            if not stories:
+                print("No news stories found with the specified criteria.")
+            else:
+                for story in stories:
+                    print(f"├── ID: {story['id']}")
+                    print(f"├── Headline: {story['headline']}")
+                    print(f"├── Category: {story['full_category']}")
+                    print(f"├── Region: {story['full_region']}")
+                    print(f"├── Author: {story.get('author_name', 'N/A')}")
+                    print(f"├── Date: {story['date']}")
+                    print(f"└── Details: {story['details']}\n")
+            """
+        #else:
+            #print("Failed to get news:", response.text)
 
 def delete_story(story_id):
     global current_user, session
