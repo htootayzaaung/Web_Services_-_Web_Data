@@ -146,16 +146,24 @@ def parse_news_args(args):
 
 def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     pythonanywhere_urls = ["http://127.0.0.1:8000/api/stories"]
-    
+    agency_details = {}
+
     url = "http://newssites.pythonanywhere.com/api/directory/"
     response = requests.get(url)
     if response.status_code == 200:
         agencies = response.json()
         for agency in agencies:
             if ".pythonanywhere.com" in agency['url']:
-                full_url = agency['url'].rstrip("/") + "/api/stories"
+                base_url = agency['url'].rstrip("/")
+                full_url = base_url + "/api/stories"
                 pythonanywhere_urls.append(full_url)
-                
+                # Store agency details
+                agency_details[base_url] = {
+                    'name': agency['agency_name'],
+                    'url': agency['url'],
+                    'code': agency['agency_code']
+                }
+
     session = requests.Session()
     for url in pythonanywhere_urls:
         params = {}
@@ -176,23 +184,27 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
         response = session.get(url, params=params)
         if response.status_code == 200:
             stories_response = response.json()
-            print("Debug - Raw response:", stories_response)  # Debugging line
             stories = stories_response.get('stories', [])
             if not stories:
                 print("No news stories found with the specified criteria.")
             else:
                 for story in stories:
+                    # Extract base URL for agency details
+                    story_base_url = url.rsplit('/api/stories', 1)[0]
+                    agency_info = agency_details.get(story_base_url, {'name': 'N/A', 'url': 'N/A', 'code': 'N/A'})
+
                     print(f"├── Key: {story.get('key', 'N/A')}")
                     print(f"├── Headline: {story.get('headline', 'N/A')}")
                     print(f"├── Category: {story.get('story_cat', 'N/A')}")
                     print(f"├── Region: {story.get('story_region', 'N/A')}")
                     print(f"├── Date: {story.get('story_date', 'N/A')}")
                     print(f"├── Details: {story.get('story_details', 'N/A')}")
-                    print(f"├── Agency Name: {story.get('agency_name', 'N/A')}")
-                    print(f"├── Agency URL: {story.get('agency_url', 'N/A')}")
-                    print(f"└── Agency Code: {story.get('agency_code', 'N/A')}\n")
+                    print(f"├── Agency Name: {agency_info['name']}")
+                    print(f"├── Agency URL: {agency_info['url']}")
+                    print(f"└── Agency Code: {agency_info['code']}\n")
         #else:
             #print("Failed to get news:", response.text)
+
 
 def delete_story(story_id):
     global current_user, session
