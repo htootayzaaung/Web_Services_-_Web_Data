@@ -145,22 +145,18 @@ def parse_news_args(args):
     return switches, invalid_keyword_found, format_error_found
 
 def get_news_from_service(id=None, category="*", region="*", news_date="*"):
-    # Create an empty array to store all the url that has ".pythonanywhere.com" in it
     pythonanywhere_urls = ["http://127.0.0.1:8000/api/stories"]
     
     url = "http://newssites.pythonanywhere.com/api/directory/"
     response = requests.get(url)
     if response.status_code == 200:
-        agencies = response.json()  # Expecting a direct list here
+        agencies = response.json()
         for agency in agencies:
-            # append all the agency['url'] that has ".pythonanywhere.com" in it and get rid of the last "/"
             if ".pythonanywhere.com" in agency['url']:
                 full_url = agency['url'].rstrip("/") + "/api/stories"
                 pythonanywhere_urls.append(full_url)
                 
-                
     session = requests.Session()
-    # for each url in the array pythonanywhere_urls, get the news
     for url in pythonanywhere_urls:
         params = {}
         if id and id.strip():
@@ -179,21 +175,22 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
 
         response = session.get(url, params=params)
         if response.status_code == 200:
-            stories = response.json()
-            print(stories, "\n")
-            """
+            stories_response = response.json()
+            print("Debug - Raw response:", stories_response)  # Debugging line
+            stories = stories_response.get('stories', [])
             if not stories:
                 print("No news stories found with the specified criteria.")
             else:
                 for story in stories:
-                    print(f"├── ID: {story['id']}")
-                    print(f"├── Headline: {story['headline']}")
-                    print(f"├── Category: {story['full_category']}")
-                    print(f"├── Region: {story['full_region']}")
-                    print(f"├── Author: {story.get('author_name', 'N/A')}")
-                    print(f"├── Date: {story['date']}")
-                    print(f"└── Details: {story['details']}\n")
-            """
+                    print(f"├── Key: {story.get('key', 'N/A')}")
+                    print(f"├── Headline: {story.get('headline', 'N/A')}")
+                    print(f"├── Category: {story.get('story_cat', 'N/A')}")
+                    print(f"├── Region: {story.get('story_region', 'N/A')}")
+                    print(f"├── Date: {story.get('story_date', 'N/A')}")
+                    print(f"├── Details: {story.get('story_details', 'N/A')}")
+                    print(f"├── Agency Name: {story.get('agency_name', 'N/A')}")
+                    print(f"├── Agency URL: {story.get('agency_url', 'N/A')}")
+                    print(f"└── Agency Code: {story.get('agency_code', 'N/A')}\n")
         #else:
             #print("Failed to get news:", response.text)
 
