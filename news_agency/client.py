@@ -148,6 +148,7 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     pythonanywhere_urls = ["http://127.0.0.1:8000/api/stories"]
     agency_details = {}
 
+    # Fetching agency URLs and details
     url = "http://newssites.pythonanywhere.com/api/directory/"
     response = requests.get(url)
     if response.status_code == 200:
@@ -157,7 +158,6 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
                 base_url = agency['url'].rstrip("/")
                 full_url = base_url + "/api/stories"
                 pythonanywhere_urls.append(full_url)
-                # Store agency details
                 agency_details[base_url] = {
                     'name': agency['agency_name'],
                     'url': agency['url'],
@@ -165,45 +165,51 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
                 }
 
     session = requests.Session()
+    all_stories = []
     for url in pythonanywhere_urls:
-        params = {}
-        if id and id.strip():
-            params['id'] = id.strip()
-        if category and category != "*":
-            params['category'] = category.strip()
-        if region and region != "*":
-            params['region'] = region.strip()
-        if news_date and news_date != "*":
-            try:
-                parsed_date = datetime.datetime.strptime(news_date, "%d/%m/%Y").date()
-                params['date'] = parsed_date.isoformat()
-            except ValueError:
-                print("Invalid date format. Please enter the date in 'dd/mm/yyyy' format.")
-                return
-
-        response = session.get(url, params=params)
+        response = session.get(url)
         if response.status_code == 200:
             stories_response = response.json()
             stories = stories_response.get('stories', [])
-            if not stories:
-                print("No news stories found with the specified criteria.")
-            else:
-                for story in stories:
-                    # Extract base URL for agency details
-                    story_base_url = url.rsplit('/api/stories', 1)[0]
-                    agency_info = agency_details.get(story_base_url, {'name': 'N/A', 'url': 'N/A', 'code': 'N/A'})
+            for story in stories:
+                story_base_url = url.rsplit('/api/stories', 1)[0]
+                agency_info = agency_details.get(story_base_url, {'name': 'N/A', 'url': 'N/A', 'code': 'N/A'})
+                story.update({
+                    'agency_name': agency_info['name'],
+                    'agency_url': agency_info['url'],
+                    'agency_code': agency_info['code']
+                })
+            all_stories.extend(stories)
 
-                    print(f"├── Key: {story.get('key', 'N/A')}")
-                    print(f"├── Headline: {story.get('headline', 'N/A')}")
-                    print(f"├── Category: {story.get('story_cat', 'N/A')}")
-                    print(f"├── Region: {story.get('story_region', 'N/A')}")
-                    print(f"├── Date: {story.get('story_date', 'N/A')}")
-                    print(f"├── Details: {story.get('story_details', 'N/A')}")
-                    print(f"├── Agency Name: {agency_info['name']}")
-                    print(f"├── Agency URL: {agency_info['url']}")
-                    print(f"└── Agency Code: {agency_info['code']}\n")
-        #else:
-            #print("Failed to get news:", response.text)
+    # Client-side filtering
+    if id:
+        all_stories = [story for story in all_stories if str(story.get('key')) == id]
+    if category != "*":
+        all_stories = [story for story in all_stories if story.get('story_cat') == category]
+    if region != "*":
+        all_stories = [story for story in all_stories if story.get('story_region') == region]
+    if news_date != "*":
+        try:
+            parsed_date = datetime.datetime.strptime(news_date, "%d/%m/%Y").date()
+            all_stories = [story for story in all_stories if datetime.datetime.strptime(story.get('story_date'), "%d/%m/%Y").date() == parsed_date]
+        except ValueError:
+            print("Invalid date format. Please enter the date in 'dd/mm/yyyy' format.")
+            return
+
+    # Printing the stories
+    if not all_stories:
+        print("No news stories found with the specified criteria.")
+    else:
+        for story in all_stories:
+            print(f"├── Key: {story.get('key', 'N/A')}")
+            print(f"├── Headline: {story.get('headline', 'N/A')}")
+            print(f"├── Category: {story.get('story_cat', 'N/A')}")
+            print(f"├── Region: {story.get('story_region', 'N/A')}")
+            print(f"├── Date: {story.get('story_date', 'N/A')}")
+            print(f"├── Details: {story.get('story_details', 'N/A')}")
+            print(f"├── Agency Name: {story.get('agency_name', 'N/A')}")
+            print(f"├── Agency URL: {story.get('agency_url', 'N/A')}")
+            print(f"└── Agency Code: {story.get('agency_code', 'N/A')}\n")
 
 
 def delete_story(story_id):
