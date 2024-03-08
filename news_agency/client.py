@@ -3,6 +3,7 @@ import getpass
 import sys
 import datetime
 import shlex
+import concurrent.futures
 
 # Base URL of your Django API
 API_BASE_URL = "http://127.0.0.1:8000/api/"
@@ -144,6 +145,13 @@ def parse_news_args(args):
 
     return switches, invalid_keyword_found, format_error_found
 
+def fetch_stories(session, url):
+    response = session.get(url)
+    if response.status_code == 200:
+        stories_response = response.json()
+        return stories_response.get('stories', [])
+    return []
+
 def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     pythonanywhere_urls = ["http://127.0.0.1:8000/api/stories"]
     agency_details = {}
@@ -166,20 +174,24 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
 
     session = requests.Session()
     all_stories = []
-    for url in pythonanywhere_urls:
-        response = session.get(url)
-        if response.status_code == 200:
-            stories_response = response.json()
-            stories = stories_response.get('stories', [])
-            for story in stories:
-                story_base_url = url.rsplit('/api/stories', 1)[0]
-                agency_info = agency_details.get(story_base_url, {'name': 'N/A', 'url': 'N/A', 'code': 'N/A'})
-                story.update({
-                    'agency_name': agency_info['name'],
-                    'agency_url': agency_info['url'],
-                    'agency_code': agency_info['code']
-                })
-            all_stories.extend(stories)
+    # Use ThreadPoolExecutor to fetch stories in parallel
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pythonanywhere_urls)) as executor:
+        future_to_url = {executor.submit(fetch_stories, session, url): url for url in pythonanywhere_urls}
+        for future in concurrent.futures.as_completed(future_to_url):
+            url = future_to_url[future]
+            try:
+                stories = future.result()
+                for story in stories:
+                    story_base_url = url.rsplit('/api/stories', 1)[0]
+                    agency_info = agency_details.get(story_base_url, {'name': 'N/A', 'url': 'N/A', 'code': 'N/A'})
+                    story.update({
+                        'agency_name': agency_info['name'],
+                        'agency_url': agency_info['url'],
+                        'agency_code': agency_info['code']
+                    })
+                all_stories.extend(stories)
+            except Exception as exc:
+                print('%r generated an exception: %s' % (url, exc))
 
     # Client-side filtering
     if id:
