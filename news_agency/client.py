@@ -145,10 +145,19 @@ def parse_news_args(args):
 
     return switches, invalid_keyword_found, format_error_found
 
+def parse_date(date_string):
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d"):  # Add or remove formats as you know are used by the agencies
+        try:
+            return datetime.datetime.strptime(date_string, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError(f"Date {date_string} is not in a recognized format")
+
 def fetch_stories(session, url):
     response = session.get(url)
     if response.status_code == 200:
         stories_response = response.json()
+        print(stories_response, "\n")
         return stories_response.get('stories', [])
     return []
 
@@ -202,12 +211,30 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
         all_stories = [story for story in all_stories if story.get('story_region') == region]
     if news_date != "*":
         try:
-            parsed_date = datetime.datetime.strptime(news_date, "%d/%m/%Y").date()
-            all_stories = [story for story in all_stories if datetime.datetime.strptime(story.get('story_date'), "%d/%m/%Y").date() == parsed_date]
-        except ValueError:
+            # Parse the user input date from DD/MM/YYYY to a date object
+            user_date = datetime.datetime.strptime(news_date, "%d/%m/%Y").date()
+            
+            # Now, convert the story dates to date objects for comparison
+            filtered_stories = []
+            for story in all_stories:
+                try:
+                    # Parse the date from the story using the parse_date function
+                    story_date = parse_date(story['story_date'])
+                    
+                    # If the story date is valid, compare and add to the list
+                    if story_date >= user_date:
+                        filtered_stories.append(story)
+                except ValueError as e:
+                    # If parsing fails, log an error and skip the story
+                    print(f"Error parsing date from story {story['key']}: {e}")
+
+            all_stories = filtered_stories
+            
+        except ValueError as e:
+            print(f"Error parsing user date: {e}")
             print("Invalid date format. Please enter the date in 'dd/mm/yyyy' format.")
             return
-
+        
     # Printing the stories
     if not all_stories:
         print("No news stories found with the specified criteria.")
@@ -317,4 +344,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

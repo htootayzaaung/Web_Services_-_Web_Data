@@ -81,10 +81,10 @@ def stories_view(request):
             stories = stories.filter(region=story_region)
         if story_date != '*':
             try:
-                story_date = datetime.datetime.strptime(story_date, "%Y-%m-%d").date()
-                stories = stories.filter(date__gte=story_date)
+                parsed_date = datetime.datetime.strptime(story_date, "%d/%m/%Y").date()
+                stories = stories.filter(date__gte=parsed_date)
             except ValueError:
-                return Response({"message": "Invalid date format. Please enter the date in 'yyyy-mm-dd' format."},
+                return Response({"message": "Invalid date format. Please enter the date in 'dd/mm/yyyy' format."},
                                 status=status.HTTP_400_BAD_REQUEST)
 
         serializer = NewsStorySerializer(stories, many=True)
@@ -109,4 +109,3 @@ def delete_story(request, pk):
     except NewsStory.DoesNotExist:
         return Response({"message": "Story not found."},
                         status=status.HTTP_404_NOT_FOUND)
-
