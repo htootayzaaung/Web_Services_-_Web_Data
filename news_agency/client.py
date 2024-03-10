@@ -82,9 +82,11 @@ def post_story():
 
     response = session.post(url, json={
         'headline': headline, 
-        'category': category.lower(), 
-        'region': region.lower(), 
-        'details': details
+        'story_cat': category.lower(), 
+        'story_region': region.lower(), 
+        'story_date': datetime.datetime.now().strftime('%Y-%m-%d'),
+        'story_details': details,
+        'author': current_user['name']
     }, headers=headers)
 
     if response.status_code == 201:
@@ -157,7 +159,7 @@ def fetch_stories(session, url):
     response = session.get(url)
     if response.status_code == 200:
         stories_response = response.json()
-        print(stories_response, "\n")
+        #print(stories_response, "\n")
         return stories_response.get('stories', [])
     return []
 
@@ -204,7 +206,7 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
 
     # Client-side filtering
     if id:
-        all_stories = [story for story in all_stories if str(story.get('key')) == id]
+        all_stories = [story for story in all_stories if story.get('agency_code') == id]
     if category != "*":
         all_stories = [story for story in all_stories if story.get('story_cat') == category]
     if region != "*":
@@ -240,10 +242,12 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
         print("No news stories found with the specified criteria.")
     else:
         for story in all_stories:
+            print(story, "\n")
             print(f"├── Key: {story.get('key', 'N/A')}")
             print(f"├── Headline: {story.get('headline', 'N/A')}")
             print(f"├── Category: {story.get('story_cat', 'N/A')}")
             print(f"├── Region: {story.get('story_region', 'N/A')}")
+            print(f"├── Author: {story.get('author', 'N/A')}")
             print(f"├── Date: {story.get('story_date', 'N/A')}")
             print(f"├── Details: {story.get('story_details', 'N/A')}")
             print(f"├── Agency Name: {story.get('agency_name', 'N/A')}")
@@ -317,8 +321,11 @@ def main():
         if not command_parts:
             print("No command entered.")
             continue
-        if command_parts[0] == 'login' and len(command_parts) == 2:
-            login(command_parts[1])
+        if command_parts[0] == 'login':
+            if len(command_parts) == 2:
+                login(command_parts[1])
+            else:
+                print("Invalid command format. Expected format is 'login <API URL>'.")
         elif command_parts[0] == 'logout':
             logout(API_BASE_URL)
         elif command_parts[0] == 'post':
@@ -344,3 +351,25 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+"""
+Improvements:
+
+- When I just type in "login" without an API URL it provides me the following output -> "Unknown command."
+Which I think is slightly ambiguous and vague and the message is not good enough.
+
+- I am getting these errors when I tried to post a story:
+Command: post
+Enter headline: Posting a story after a long time.
+Enter category: trivia
+Enter region: uk
+Enter details: Testing 1, 2, 3
+Debug: Headline - Posting a story after a long time., Category - trivia, Region - uk
+Failed to post story due to the following errors:
+Story_cat error: This field is required..
+Story_region error: This field is required..
+Author error: This field is required..
+Story_date error: This field is required..
+Story_details error: This field is required..
+ 
+"""
