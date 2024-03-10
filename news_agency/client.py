@@ -18,13 +18,19 @@ def login(api_url):
     response = session.post(api_url, data={'username': username, 'password': password})
     
     if response.status_code == 200:
-        user_data = response.json()
+        # Handle text response
+        welcome_message = response.text
+        print(welcome_message)
         current_user['is_logged_in'] = True
         current_user['username'] = username
-        current_user['name'] = user_data.get('name')
-        print(f"Login successful. Welcome, {current_user['name']} ({username})!")
+
+        # Extract name from the welcome message
+        name_start = welcome_message.find(",") + 2  # Adjust the index as per your message format
+        name_end = welcome_message.find("!", name_start)
+        current_user['name'] = welcome_message[name_start:name_end] if name_start < name_end else None
     else:
-        print("Login failed. Please check username and password.")
+        # Print the error message as plain text
+        print(response.text)
 
 def logout(api_base_url):
     global current_user, session
@@ -40,11 +46,11 @@ def logout(api_base_url):
 
     response = session.post(api_base_url + 'logout', headers=headers)
     if response.status_code == 200:
-        print(f"Logout successful for {current_user['name']} ({current_user['username']}).")
+        print(response.text)  # Display plain text success message
         current_user = {'is_logged_in': False, 'username': None, 'name': None}
         session.cookies.clear()
     else:
-        print("Logout failed:", response.text)
+        print(f"Logout failed: {response.text}")  # Display plain text error message
 
 def post_story():
     global current_user, session
@@ -55,20 +61,34 @@ def post_story():
     if not current_user['is_logged_in']:
         print("You must be logged in to post a story.")
         return
-    
-    # Prompt for story details
-    headline = input("Enter headline: ")
-    category = input("Enter category: ")
-    region = input("Enter region: ")
-    details = input("Enter details: ")
 
-    # Validation for category and region
+    # Prompt for story details
+    headline = input("Enter headline: ").strip()
+    category = input("Enter category: ").strip().lower()
+    region = input("Enter region: ").strip().lower()
+    details = input("Enter details: ").strip()
+
+    # Validation for category, region, and details
+    if not headline:
+        print("Headline cannot be blank!")
+        return
     if category not in valid_categories:
-        print(f"Invalid category. Valid categories are: {', '.join(valid_categories)}.")
+        print(f"Invalid category! Valid categories are: {', '.join(valid_categories)}.")
         return
     if region not in valid_regions:
-        print(f"Invalid region. Valid regions are: {', '.join(valid_regions)}.")
+        print(f"Invalid region! Valid regions are: {', '.join(valid_regions)}.")
         return
+    if not details:
+        print("Story details cannot be blank!")
+        return
+
+    story_data = {
+        'headline': headline, 
+        'story_cat': category, 
+        'story_region': region, 
+        'story_date': datetime.datetime.now().strftime('%Y-%m-%d'),
+        'story_details': details
+    }
 
     url = API_BASE_URL + "stories"
     
@@ -77,40 +97,27 @@ def post_story():
 
     # Include CSRF token in request headers
     headers = {'X-CSRFToken': csrf_token} if csrf_token else {}
-    
-    print(f"Debug: Headline - {headline}, Category - {category}, Region - {region}")
 
-    response = session.post(url, json={
-        'headline': headline, 
-        'story_cat': category.lower(), 
-        'story_region': region.lower(), 
-        'story_date': datetime.datetime.now().strftime('%Y-%m-%d'),
-        'story_details': details,
-        'author': current_user['name']
-    }, headers=headers)
+    response = session.post(url, json=story_data, headers=headers)
 
     if response.status_code == 201:
         print("Story posted successfully.")
     else:
+        # Handle non-JSON response as plain text
+        if 'application/json' not in response.headers.get('Content-Type', ''):
+            print(response.text)
+            return
+
+        # Handle JSON response
         error_message = response.json()
         formatted_errors = []
-
-        # Iterate through the errors and create a user-friendly message
         for field, messages in error_message.items():
-            # For fields with choices like 'category' and 'region', provide the valid choices
-            if field in ['category', 'region']:
-                valid_choices = {
-                    'category': ['pol', 'art', 'tech', 'trivia'],
-                    'region': ['uk', 'eu', 'w']
-                }
-                formatted_errors.append(f"{field.capitalize()} error: {', '.join(messages)}. Valid choices are: {', '.join(valid_choices[field])}.")
-            else:
-                # Generic error formatting for other fields
-                formatted_errors.append(f"{field.capitalize()} error: {', '.join(messages)}.")
+            formatted_errors.append(f"{field.capitalize()} error: {', '.join(messages)}.")
 
-        # Join all the error messages into one string and print it
         print("Failed to post story due to the following errors:")
         print("\n".join(formatted_errors))
+
+
 
 def parse_news_args(args):
     valid_keys = {'id', 'cat', 'reg', 'date'}
@@ -350,25 +357,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-"""
-Improvements:
-
-- When I just type in "login" without an API URL it provides me the following output -> "Unknown command."
-Which I think is slightly ambiguous and vague and the message is not good enough.
-
-- I am getting these errors when I tried to post a story:
-Command: post
-Enter headline: Posting a story after a long time.
-Enter category: trivia
-Enter region: uk
-Enter details: Testing 1, 2, 3
-Debug: Headline - Posting a story after a long time., Category - trivia, Region - uk
-Failed to post story due to the following errors:
-Story_cat error: This field is required..
-Story_region error: This field is required..
-Author error: This field is required..
-Story_date error: This field is required..
-Story_details error: This field is required..
- 
-"""

@@ -27,54 +27,47 @@ def login_view(request):
             author_name = author.name
         except Author.DoesNotExist:
             author_name = None
-        return Response({
-            "username": username,
-            "name": author_name  # Now you return the author's name
-        }, status=status.HTTP_200_OK)
+        return HttpResponse(f"Welcome, {author_name}!", status=status.HTTP_200_OK, content_type="text/plain")
     else:
-        return Response({"message": "Login failed. Please check username and password."},
-                        status=status.HTTP_401_UNAUTHORIZED)
+        return HttpResponse("Login failed. Please check username and password.", status=status.HTTP_401_UNAUTHORIZED, content_type="text/plain")
 
 #Log Out
 @api_view(['POST'])
 def logout_view(request):
     logout(request)
-    return Response({"message": "You are now logged out."}, status=status.HTTP_200_OK)
+    return HttpResponse("Goodbye! You are now logged out.", status=status.HTTP_200_OK, content_type="text/plain")
 
 #Post Story and Get Stories
 @api_view(['GET', 'POST'])
 def stories_view(request):
     if request.method == 'POST':
-        if request.user.is_authenticated:
-            data = request.data.copy()
-            # Set the date to today if it's not provided
-            data.setdefault('date', date.today().isoformat())
+        if not request.user.is_authenticated:
+            return HttpResponse("User not authenticated. Cannot post story.", status=status.HTTP_503_SERVICE_UNAVAILABLE, content_type="text/plain")
 
-            try:
-                author_instance = Author.objects.get(username=request.user.username)
-            except Author.DoesNotExist:
-                return Response({"message": "Author not found."},
-                                status=status.HTTP_404_NOT_FOUND)
+        data = request.data.copy()
+        data.setdefault('date', date.today().isoformat())
 
-            serializer = NewsStorySerializer(data=data)
-            if serializer.is_valid():
-                serializer.save(author=author_instance)
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            else:
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            author_instance = Author.objects.get(username=request.user.username)
+            data['author'] = author_instance.id  # Set author as the instance's ID
+        except Author.DoesNotExist:
+            return HttpResponse("Author not found.", status=status.HTTP_503_SERVICE_UNAVAILABLE, content_type="text/plain")
+
+        serializer = NewsStorySerializer(data=request.data, context={'author': author_instance})
+        if serializer.is_valid():
+            serializer.save()
+            return HttpResponse("Story posted successfully.", status=status.HTTP_201_CREATED, content_type="text/plain")
         else:
-            return Response({"message": "User not authenticated."},
-                            status=status.HTTP_401_UNAUTHORIZED)
-            
+            errors = serializer.errors
+            return HttpResponse("Failed to post story: " + str(errors), status=status.HTTP_503_SERVICE_UNAVAILABLE, content_type="text/plain")
+    
     elif request.method == 'GET':
-        story_id = request.query_params.get('id')
         story_cat = request.query_params.get('category', '*')
         story_region = request.query_params.get('region', '*')
         story_date = request.query_params.get('date', '*')
 
         stories = NewsStory.objects.all()
-        if story_id:
-            stories = stories.filter(id=story_id)
+
         if story_cat != '*':
             stories = stories.filter(category=story_cat)
         if story_region != '*':
@@ -84,12 +77,14 @@ def stories_view(request):
                 parsed_date = datetime.datetime.strptime(story_date, "%d/%m/%Y").date()
                 stories = stories.filter(date__gte=parsed_date)
             except ValueError:
-                return Response({"message": "Invalid date format. Please enter the date in 'dd/mm/yyyy' format."},
-                                status=status.HTTP_400_BAD_REQUEST)
+                return HttpResponse("Invalid date format. Please enter the date in 'dd/mm/yyyy' format.", status=status.HTTP_400_BAD_REQUEST, content_type="text/plain")
+
+        if not stories.exists():
+            return HttpResponse("No stories found matching the criteria.", status=status.HTTP_404_NOT_FOUND, content_type="text/plain")
 
         serializer = NewsStorySerializer(stories, many=True)
         return Response({'stories': serializer.data})
-    
+
 @api_view(['DELETE'])
 def delete_story(request, pk):
     try:
@@ -98,14 +93,13 @@ def delete_story(request, pk):
             # Check if the logged-in user is the author of the story
             if story.author.username == request.user.username:
                 story.delete()
-                return Response({"message": "Story deleted successfully."},
-                                status=status.HTTP_200_OK)
+                return HttpResponse("Story deleted successfully.", status=status.HTTP_200_OK, content_type="text/plain")
             else:
-                return Response({"message": "Unauthorized to delete this story."},
-                                status=status.HTTP_403_FORBIDDEN)
+                return HttpResponse("Unauthorized to delete this story.", status=status.HTTP_403_FORBIDDEN, content_type="text/plain")
         else:
-            return Response({"message": "User not authenticated."},
-                            status=status.HTTP_401_UNAUTHORIZED)
+            return HttpResponse("User not authenticated.", status=status.HTTP_401_UNAUTHORIZED, content_type="text/plain")
     except NewsStory.DoesNotExist:
-        return Response({"message": "Story not found."},
-                        status=status.HTTP_404_NOT_FOUND)
+        return HttpResponse("Story not found.", status=status.HTTP_404_NOT_FOUND, content_type="text/plain")
+    except Exception as e:
+        # Handle any other exception
+        return HttpResponse(f"An error occurred: {str(e)}", status=status.HTTP_503_SERVICE_UNAVAILABLE, content_type="text/plain")
