@@ -120,7 +120,6 @@ def parse_news_args(args):
 
     for arg in args:
         if "=" not in arg:
-            print(f"Invalid command format: {arg}. Expected format is -key=value.")
             format_error_found = True
             continue
 
