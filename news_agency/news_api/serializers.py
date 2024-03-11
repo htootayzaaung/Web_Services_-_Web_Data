@@ -51,12 +51,3 @@ class NewsStorySerializer(serializers.ModelSerializer):
 
         return news_story
 
-"""
-In this implementation:
-
-    The create method hashes the password when creating a new Author instance.
-    The update method hashes the password when updating an existing Author instance, provided a new password is given.
-    The password field is set as write_only to ensure it's not included in the serialized output, enhancing security.
-
-This approach will effectively handle password hashing as part of the serialization process when creating or updating Author instances via your API.
-"""

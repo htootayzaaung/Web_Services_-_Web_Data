@@ -12,11 +12,21 @@ import datetime
 from datetime import date
 
 def root_view(request):
+    """
+    The root view of the API.
+    Returns a simple welcome message when accessed.
+    """
     return HttpResponse("Welcome to the News Agency API.")
 
 #Log In
 @api_view(['POST'])
 def login_view(request):
+    """
+    API view for logging in an author.
+    Expects 'username' and 'password' in the request data.
+    Authenticates the user and returns a welcome message on success.
+    Returns an error message with 401 status code if authentication fails.
+    """
     username = request.data.get('username')
     password = request.data.get('password')
     user = authenticate(request, username=username, password=password)
@@ -34,12 +44,24 @@ def login_view(request):
 #Log Out
 @api_view(['POST'])
 def logout_view(request):
+    """
+    API view for logging out an author.
+    Logs out the user using Django's logout method.
+    Returns a goodbye message on successful logout.
+    """
     logout(request)
     return HttpResponse("Goodbye! You are now logged out.", status=status.HTTP_200_OK, content_type="text/plain")
 
 #Post Story and Get Stories
 @api_view(['GET', 'POST'])
 def stories_view(request):
+    """
+    API view to handle news stories.
+    Supports both GET and POST methods.
+    GET: Fetches and filters stories based on category, region, and date.
+    POST: Allows an authenticated author to post a new story.
+    For POST, requires user authentication and validates input data.
+    """
     if request.method == 'POST':
         if not request.user.is_authenticated:
             return HttpResponse("User not authenticated. Cannot post story.", status=status.HTTP_503_SERVICE_UNAVAILABLE, content_type="text/plain")
@@ -87,6 +109,12 @@ def stories_view(request):
 
 @api_view(['DELETE'])
 def delete_story(request, pk):
+    """
+    API view to delete a specific news story.
+    Expects a primary key (pk) of the story to delete.
+    Allows deletion only if the user is authenticated and is the author of the story.
+    Returns appropriate messages and status codes based on the outcome of the operation.
+    """
     try:
         story = NewsStory.objects.get(pk=pk)
         if request.user.is_authenticated:

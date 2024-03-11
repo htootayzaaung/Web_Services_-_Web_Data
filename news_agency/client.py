@@ -12,6 +12,13 @@ session = requests.Session()
 current_user = {'is_logged_in': False, 'username': None, 'name': None}
 
 def login(api_url):
+    """
+    Logs in to an author's account.
+    Sends a POST request with the user's credentials.
+    If successful, updates the current_user's state to logged in and sets their details.
+    Parameters:
+    - api_url: The URL endpoint for the login API.
+    """
     global current_user
     username = input("Enter username: ")
     password = getpass.getpass("Enter password: ")
@@ -33,6 +40,13 @@ def login(api_url):
         print(response.text)
 
 def logout(api_base_url):
+    """
+    Logs out from an author's account.
+    Sends a POST request to the logout API endpoint.
+    If successful, resets the current_user's state to logged out.
+    Parameters:
+    - api_base_url: The base URL of the API.
+    """
     global current_user, session
     if not current_user['is_logged_in']:
         print("No user is logged in.")
@@ -53,6 +67,12 @@ def logout(api_base_url):
         print(f"Logout failed: {response.text}")  # Display plain text error message
 
 def post_story():
+    """
+    Posts a news story.
+    Prompts the user for story details and sends a POST request.
+    Checks if the user is logged in before posting.
+    Validates the input before sending the request.
+    """
     global current_user, session
     valid_categories = ['pol', 'art', 'tech', 'trivia']
     valid_regions = ['uk', 'eu', 'w']
@@ -154,6 +174,13 @@ def parse_news_args(args):
     return switches, invalid_keyword_found, format_error_found
 
 def parse_date(date_string):
+    """
+    Parses a date string into a datetime object.
+    Supports multiple date formats.
+    Parameters:
+    - date_string: String representation of the date.
+    Raises ValueError if the date format is unrecognized.
+    """
     for fmt in ("%d/%m/%Y", "%Y-%m-%d"):  # Add or remove formats as you know are used by the agencies
         try:
             return datetime.datetime.strptime(date_string, fmt).date()
@@ -162,6 +189,13 @@ def parse_date(date_string):
     raise ValueError(f"Date {date_string} is not in a recognized format")
 
 def fetch_stories(session, url):
+    """
+    Fetches stories from a given URL.
+    Sends a GET request and returns the list of stories.
+    Parameters:
+    - session: The requests session object.
+    - url: URL to fetch stories from.
+    """
     response = session.get(url)
     if response.status_code == 200:
         stories_response = response.json()
@@ -170,6 +204,15 @@ def fetch_stories(session, url):
     return []
 
 def get_news_from_service(id=None, category="*", region="*", news_date="*"):
+    """
+    Aggregates news stories based on filters.
+    Filters include agency ID, category, region, and date.
+    Parameters:
+    - id: Agency ID to filter by.
+    - category: Story category to filter by.
+    - region: Story region to filter by.
+    - news_date: Date filter for the stories.
+    """
     pythonanywhere_urls = ["http://127.0.0.1:8000/api/stories"]
     agency_details = {}
 
@@ -248,7 +291,7 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
         print("No news stories found with the specified criteria.")
     else:
         for story in all_stories:
-            print(story, "\n")
+            #print(story, "\n")
             print(f"├── Key: {story.get('key', 'N/A')}")
             print(f"├── Headline: {story.get('headline', 'N/A')}")
             print(f"├── Category: {story.get('story_cat', 'N/A')}")
@@ -262,6 +305,13 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
 
 
 def delete_story(story_id):
+    """
+    Deletes a specific news story.
+    Sends a DELETE request to the server.
+    Requires the user to be logged in and checks if they are the author of the story.
+    Parameters:
+    - story_id: The unique identifier of the story to be deleted.
+    """
     global current_user, session
 
     if not current_user['is_logged_in']:
@@ -284,6 +334,10 @@ def delete_story(story_id):
         print("Failed to delete the story:", response.text)
 
 def list_agencies():
+    """
+    Lists all news agencies in the directory.
+    Sends a GET request to fetch and display the list of agencies.
+    """
     url = "http://newssites.pythonanywhere.com/api/directory/"
     response = requests.get(url)
 
