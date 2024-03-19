@@ -5,17 +5,18 @@ import datetime
 import shlex
 import concurrent.futures
 
-# Base URL of your Django API
-API_BASE_URL = "http://127.0.0.1:8000/api/"
 
 session = requests.Session()
-current_user = {'is_logged_in': False, 'username': None, 'name': None}
+current_user = {'is_logged_in': False, 'username': None, 'name': None, 'api_base_url': None}
 
 def login(api_url):
     global current_user
     username = input("Enter username: ")
     password = getpass.getpass("Enter password: ")
-    response = session.post(api_url, data={'username': username, 'password': password})
+    # Construct the login URL based on the user's input
+    login_url = f"{api_url}login" if api_url.endswith('/') else f"{api_url}/login"
+    
+    response = session.post(login_url, data={'username': username, 'password': password})
     
     if response.status_code == 200:
         # Handle text response
@@ -23,6 +24,7 @@ def login(api_url):
         print(welcome_message)
         current_user['is_logged_in'] = True
         current_user['username'] = username
+        current_user['api_base_url'] = api_url  # Store the API base URL
 
         # Extract name from the welcome message
         name_start = welcome_message.find(",") + 2  # Adjust the index as per your message format
@@ -32,22 +34,28 @@ def login(api_url):
         # Print the error message as plain text
         print(response.text)
 
-def logout(api_base_url):
+def logout():
     global current_user, session
     if not current_user['is_logged_in']:
         print("No user is logged in.")
         return
     
+    # Use the api_base_url from current_user
+    api_base_url = current_user['api_base_url']
+    
+    # Construct the logout URL based on the stored API base URL
+    logout_url = f"{api_base_url}logout" if api_base_url.endswith('/') else f"{api_base_url}/logout"
+
     # Retrieve CSRF token from session cookies
     csrf_token = session.cookies.get('csrftoken')
 
     # Include CSRF token in request headers
     headers = {'X-CSRFToken': csrf_token} if csrf_token else {}
 
-    response = session.post(api_base_url + 'logout', headers=headers)
+    response = session.post(logout_url, headers=headers)
     if response.status_code == 200:
         print(response.text)  # Display plain text success message
-        current_user = {'is_logged_in': False, 'username': None, 'name': None}
+        current_user = {'is_logged_in': False, 'username': None, 'name': None, 'api_base_url': None}
         session.cookies.clear()
     else:
         print(f"Logout failed: {response.text}")  # Display plain text error message
@@ -90,15 +98,14 @@ def post_story():
         'story_details': details
     }
 
-    url = API_BASE_URL + "stories"
-    
-    # Retrieve the CSRF token from session cookies
-    csrf_token = session.cookies.get('csrftoken')
+    # Construct the story posting URL based on the stored API base URL
+    api_base_url = current_user['api_base_url']
+    post_url = f"{api_base_url}stories" if api_base_url.endswith('/') else f"{api_base_url}/stories"
 
-    # Include CSRF token in request headers
+    csrf_token = session.cookies.get('csrftoken')
     headers = {'X-CSRFToken': csrf_token} if csrf_token else {}
 
-    response = session.post(url, json=story_data, headers=headers)
+    response = session.post(post_url, json=story_data, headers=headers)
 
     if response.status_code == 201:
         print("Story posted successfully.")
@@ -116,6 +123,7 @@ def post_story():
 
         print("Failed to post story due to the following errors:")
         print("\n".join(formatted_errors))
+
 
 def parse_news_args(args):
     valid_keys = {'id', 'cat', 'reg', 'date'}
@@ -168,7 +176,7 @@ def fetch_stories(session, url):
     return []
 
 def get_news_from_service(id=None, category="*", region="*", news_date="*"):
-    pythonanywhere_urls = ["http://127.0.0.1:8000/api/stories"]
+    pythonanywhere_urls = []
     agency_details = {}
 
     # Fetching agency URLs and details
@@ -266,7 +274,9 @@ def delete_story(story_id):
         print("You must be logged in to delete a story.")
         return
 
-    url = API_BASE_URL + f"stories/{story_id}"
+    # Use the api_base_url from current_user for dynamic API URL handling
+    api_base_url = current_user['api_base_url']
+    delete_url = f"{api_base_url}stories/{story_id}" if api_base_url.endswith('/') else f"{api_base_url}/stories/{story_id}"
 
     # Retrieve CSRF token from session cookies
     csrf_token = session.cookies.get('csrftoken')
@@ -274,7 +284,7 @@ def delete_story(story_id):
     # Include CSRF token in request headers
     headers = {'X-CSRFToken': csrf_token} if csrf_token else {}
 
-    response = session.delete(url, headers=headers)
+    response = session.delete(delete_url, headers=headers)
 
     if response.status_code == 200:
         print("Story deleted successfully.")
@@ -296,6 +306,7 @@ def main():
     while True:
         if current_user['is_logged_in']:
             print(f"\nLogged in as: {current_user['name']} ({current_user['username']})")
+            print(f"API URL: {current_user['api_base_url']}")
         else:
             print("\nPlease log in!")
             
@@ -331,7 +342,7 @@ def main():
             else:
                 print("Invalid command format. Expected format is 'login <API URL>'.")
         elif command_parts[0] == 'logout':
-            logout(API_BASE_URL)
+            logout()
         elif command_parts[0] == 'post':
             post_story()
         elif command_parts[0] == 'news':
