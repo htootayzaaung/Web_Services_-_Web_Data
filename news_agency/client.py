@@ -5,7 +5,6 @@ import datetime
 import shlex
 import concurrent.futures
 
-
 session = requests.Session()
 current_user = {'is_logged_in': False, 'username': None, 'name': None, 'api_base_url': None}
 
@@ -14,7 +13,7 @@ def login(api_url):
     username = input("Enter username: ")
     password = getpass.getpass("Enter password: ")
     # Construct the login URL based on the user's input
-    login_url = f"{api_url}login" if api_url.endswith('/') else f"{api_url}/login"
+    login_url = f"{api_url}/api/login" if not api_url.endswith('/api/login') else api_url
     
     response = session.post(login_url, data={'username': username, 'password': password})
     
