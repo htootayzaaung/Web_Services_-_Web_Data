@@ -39,25 +39,28 @@ def logout():
         print("No user is logged in.")
         return
     
-    # Use the api_base_url from current_user
-    api_base_url = current_user['api_base_url']
+    # Assuming api_base_url is correctly stored when logging in,
+    # and it does not end with a slash.
+    logout_url = f"{current_user['api_base_url'].rstrip('/')}/api/logout"
     
-    # Construct the logout URL based on the stored API base URL
-    logout_url = f"{api_base_url}logout" if api_base_url.endswith('/') else f"{api_base_url}/logout"
-
-    # Retrieve CSRF token from session cookies
+    # Assuming that CSRF token handling is required for the logout to succeed.
+    # Retrieve CSRF token from the cookies if present; otherwise, set to None.
     csrf_token = session.cookies.get('csrftoken')
-
-    # Include CSRF token in request headers
-    headers = {'X-CSRFToken': csrf_token} if csrf_token else {}
+    
+    headers = {}
+    if csrf_token:
+        headers['X-CSRFToken'] = csrf_token
+        headers['Referer'] = current_user['api_base_url']  # Some servers check the Referer header for CSRF protection.
 
     response = session.post(logout_url, headers=headers)
-    if response.status_code == 200:
-        print(response.text)  # Display plain text success message
+    
+    if response.status_code in [200, 204]:  # Logout success
+        print("Successfully logged out.")
+        # Reset current_user and clear session cookies to clean up the session state.
         current_user = {'is_logged_in': False, 'username': None, 'name': None, 'api_base_url': None}
         session.cookies.clear()
     else:
-        print(f"Logout failed: {response.text}")  # Display plain text error message
+        print(f"Logout failed: {response.status_code} - {response.text}")
 
 def post_story():
     global current_user, session
