@@ -101,30 +101,31 @@ def post_story():
     }
 
     # Construct the story posting URL based on the stored API base URL
-    api_base_url = current_user['api_base_url']
-    post_url = f"{api_base_url}stories" if api_base_url.endswith('/') else f"{api_base_url}/stories"
+    api_base_url = current_user['api_base_url'].rstrip('/')
+    post_url = f"{api_base_url}/api/stories"
 
+    # Prepare headers including CSRF token and Referer
     csrf_token = session.cookies.get('csrftoken')
-    headers = {'X-CSRFToken': csrf_token} if csrf_token else {}
+    headers = {'Content-Type': 'application/json'}  # Explicitly state the content type
+    if csrf_token:
+        headers['X-CSRFToken'] = csrf_token
+    headers['Referer'] = api_base_url
 
     response = session.post(post_url, json=story_data, headers=headers)
 
     if response.status_code == 201:
         print("Story posted successfully.")
     else:
-        # Handle non-JSON response as plain text
-        if 'application/json' not in response.headers.get('Content-Type', ''):
-            print(response.text)
-            return
-
-        # Handle JSON response
-        error_message = response.json()
-        formatted_errors = []
-        for field, messages in error_message.items():
-            formatted_errors.append(f"{field.capitalize()} error: {', '.join(messages)}.")
-
-        print("Failed to post story due to the following errors:")
-        print("\n".join(formatted_errors))
+        # When not successful, directly show the status and response
+        print(f"Failed to post story: {response.status_code} - {response.text}")
+        if response.status_code != 200:  # If there's an error, try to parse and display it
+            try:
+                error_message = response.json()
+                formatted_errors = ", ".join([f"{k}: {', '.join(v)}" for k, v in error_message.items()])
+                print("Failed to post story due to the following errors:")
+                print(formatted_errors)
+            except Exception as e:
+                print("Error parsing the failure response.")
 
 
 def parse_news_args(args):
