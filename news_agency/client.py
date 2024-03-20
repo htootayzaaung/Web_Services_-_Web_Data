@@ -163,20 +163,44 @@ def parse_news_args(args):
     return switches, invalid_keyword_found, format_error_found
 
 def parse_date(date_string):
-    for fmt in ("%d/%m/%Y", "%Y-%m-%d"):  # Add or remove formats as you know are used by the agencies
+    date_formats = [
+        "%d/%m/%Y", "%Y-%m-%d",  # Original formats
+        "%Y-%m-%dT%H:%M:%S.%fZ",  # ISO 8601 format
+        "%Y-%m-%d %H:%M:%S.%f+00:00",  # Timestamp with timezone
+    ]
+    for fmt in date_formats:
         try:
             return datetime.datetime.strptime(date_string, fmt).date()
-        except ValueError:
-            continue
-    raise ValueError(f"Date {date_string} is not in a recognized format")
+        except (ValueError, TypeError):
+            continue  # Skip to the next format if parsing fails
+    # If no format matched, return None or raise a custom exception to handle upstream
+    print(f"Warning: Date {date_string} is not in a recognized format. Skipping this story.")
+    return None
 
 def fetch_stories(session, url):
-    response = session.get(url)
-    if response.status_code == 200:
-        stories_response = response.json()
-        #print(stories_response, "\n")
-        return stories_response.get('stories', [])
-    return []
+    try:
+        response = session.get(url)
+        if response.status_code == 200:
+            try:
+                stories_response = response.json()  # Attempt to parse JSON
+                #print(stories_response, "\n")
+                # Ensure the response is in the expected format (dict with a 'stories' key)
+                if isinstance(stories_response, dict) and 'stories' in stories_response:
+                    return stories_response['stories']
+                else:
+                    # If not, log and skip
+                    print(f"Warning: Unexpected response format from {url}. Expected a dict with 'stories'. Skipping.")
+                    return []
+            except ValueError:
+                # Handle cases where the response is not valid JSON
+                print(f"Warning: Failed to decode JSON response from {url}. Skipping.")
+                return []
+        else:
+            print(f"Warning: Received non-200 response from {url}: {response.status_code}. Skipping.")
+            return []
+    except Exception as e:
+        print(f"Error fetching stories from {url}: {e}. Skipping.")
+        return []
 
 def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     pythonanywhere_urls = []
@@ -228,29 +252,34 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
         all_stories = [story for story in all_stories if story.get('story_region') == region]
     if news_date != "*":
         try:
-            # Parse the user input date from DD/MM/YYYY to a date object
             user_date = datetime.datetime.strptime(news_date, "%d/%m/%Y").date()
-            
-            # Now, convert the story dates to date objects for comparison
             filtered_stories = []
+
             for story in all_stories:
+                # Check if 'story_date' key exists; if not, skip to the next story
+                if 'story_date' not in story or not story['story_date']:
+                    print(f"Warning: Missing 'story_date' for story {story.get('key', 'N/A')}. Skipping this story.")
+                    continue
+
                 try:
-                    # Parse the date from the story using the parse_date function
+                    # Proceed with parsing since 'story_date' exists
                     story_date = parse_date(story['story_date'])
-                    
-                    # If the story date is valid, compare and add to the list
+                    if story_date is None:
+                        continue  # If parsing returns None, skip this story
+
                     if story_date >= user_date:
                         filtered_stories.append(story)
                 except ValueError as e:
-                    # If parsing fails, log an error and skip the story
                     print(f"Error parsing date from story {story['key']}: {e}")
+                    continue  # Skip this story on error
 
             all_stories = filtered_stories
-            
+
         except ValueError as e:
             print(f"Error parsing user date: {e}")
             print("Invalid date format. Please enter the date in 'dd/mm/yyyy' format.")
             return
+
         
     # Printing the stories
     if not all_stories:
