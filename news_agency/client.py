@@ -203,6 +203,24 @@ def fetch_stories(session, url):
         print(f"Error fetching stories from {url}: {e}. Skipping.")
         return []
 
+def print_all_stories(all_stories):
+        # Printing the stories
+    if not all_stories:
+        print("No news stories found with the specified criteria.")
+    else:
+        for story in all_stories:
+            #print(story, "\n")
+            print(f"├── Key: {story.get('key', 'N/A')}")
+            print(f"├── Headline: {story.get('headline', 'N/A')}")
+            print(f"├── Category: {story.get('story_cat', 'N/A')}")
+            print(f"├── Region: {story.get('story_region', 'N/A')}")
+            print(f"├── Author: {story.get('author', 'N/A')}")
+            print(f"├── Date: {story.get('story_date', 'N/A')}")
+            print(f"├── Details: {story.get('story_details', 'N/A')}")
+            print(f"├── Agency Name: {story.get('agency_name', 'N/A')}")
+            print(f"├── Agency URL: {story.get('agency_url', 'N/A')}")
+            print(f"└── Agency Code: {story.get('agency_code', 'N/A')}\n")
+
 def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     all_agency_details = {}
 
@@ -227,42 +245,10 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     # Initialize session and stories list
     session = requests.Session()
     all_stories = []
-    agency_found = False  # Flag to track if the specified agency is found
 
-    successful_fetches = 0
-    attempted_agencies = set()
-
-    # Continue attempting to fetch until 20 successful fetches or no more agencies
-    while successful_fetches < 20 and len(attempted_agencies) < len(all_agency_details):
-        # Randomly select agencies not yet attempted, up to the number needed to reach 20
-        remaining_agencies = [url for url in all_agency_details.keys() if url not in attempted_agencies]
-        needed = 20 - successful_fetches
-        selected_agencies = random.sample(remaining_agencies, min(len(remaining_agencies), needed))
-
-        # Use ThreadPoolExecutor to fetch stories in parallel from selected agencies
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(selected_agencies)) as executor:
-            future_to_url = {executor.submit(fetch_stories, session, all_agency_details[url]['full_url']): url for url in selected_agencies}
-            for future in concurrent.futures.as_completed(future_to_url):
-                url = future_to_url[future]
-                attempted_agencies.add(url)  # Mark this agency as attempted
-                try:
-                    stories = future.result()
-                    if stories:  # Only count as successful if stories were actually fetched
-                        successful_fetches += 1
-                        agency_info = all_agency_details[url]
-                        for story in stories:
-                            story.update({
-                                'agency_name': agency_info['name'],
-                                'agency_url': agency_info['url'],
-                                'agency_code': agency_info['code']
-                            })
-                        all_stories.extend(stories)
-                except Exception as exc:
-                    print(f'{url} generated an exception: {exc}')
-
-    # Client-side filtering
-    # If an ID is specified, fetch directly from that agency
+    # If an ID is specified, fetch news only from that agency
     if id:
+        agency_found = False
         for url, details in all_agency_details.items():
             if details['code'] == id:
                 agency_found = True
@@ -279,7 +265,37 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
         if not agency_found:
             print(f"No news stories found for agency ID: {id}.")
             return  # Early return to skip fetching from random agencies
-        
+    else:
+        # Randomly select agencies if no ID is specified
+        successful_fetches = 0
+        attempted_agencies = set()
+        while successful_fetches < 20 and len(attempted_agencies) < len(all_agency_details):
+            remaining_agencies = [url for url in all_agency_details.keys() if url not in attempted_agencies]
+            needed = 20 - successful_fetches
+            selected_agencies = random.sample(remaining_agencies, min(len(remaining_agencies), needed))
+
+            # Use ThreadPoolExecutor to fetch stories in parallel from selected agencies
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(selected_agencies)) as executor:
+                future_to_url = {executor.submit(fetch_stories, session, all_agency_details[url]['full_url']): url for url in selected_agencies}
+                for future in concurrent.futures.as_completed(future_to_url):
+                    url = future_to_url[future]
+                    attempted_agencies.add(url)  # Mark this agency as attempted
+                    try:
+                        stories = future.result()
+                        if stories:  # Only count as successful if stories were actually fetched
+                            successful_fetches += 1
+                            agency_info = all_agency_details[url]
+                            for story in stories:
+                                story.update({
+                                    'agency_name': agency_info['name'],
+                                    'agency_url': agency_info['url'],
+                                    'agency_code': agency_info['code']
+                                })
+                            all_stories.extend(stories)
+                    except Exception as exc:
+                        print(f'{url} generated an exception: {exc}')
+
+    # Client-side filtering
     if category != "*":
         all_stories = [story for story in all_stories if story.get('story_cat') == category]
     if region != "*":
@@ -287,49 +303,13 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     if news_date != "*":
         try:
             user_date = datetime.datetime.strptime(news_date, "%d/%m/%Y").date()
-            filtered_stories = []
-
-            for story in all_stories:
-                # Check if 'story_date' key exists; if not, skip to the next story
-                if 'story_date' not in story or not story['story_date']:
-                    print(f"Warning: Missing 'story_date' for story {story.get('key', 'N/A')}. Skipping this story.")
-                    continue
-
-                try:
-                    # Proceed with parsing since 'story_date' exists
-                    story_date = parse_date(story['story_date'])
-                    if story_date is None:
-                        continue  # If parsing returns None, skip this story
-
-                    if story_date >= user_date:
-                        filtered_stories.append(story)
-                except ValueError as e:
-                    print(f"Error parsing date from story {story['key']}: {e}")
-                    continue  # Skip this story on error
-
-            all_stories = filtered_stories
-
+            all_stories = [story for story in all_stories if parse_date(story.get('story_date')) >= user_date]
         except ValueError as e:
             print(f"Error parsing user date: {e}")
             print("Invalid date format. Please enter the date in 'dd/mm/yyyy' format.")
             return
-        
-    # Printing the stories
-    if not all_stories:
-        print("No news stories found with the specified criteria.")
-    else:
-        for story in all_stories:
-            #print(story, "\n")
-            print(f"├── Key: {story.get('key', 'N/A')}")
-            print(f"├── Headline: {story.get('headline', 'N/A')}")
-            print(f"├── Category: {story.get('story_cat', 'N/A')}")
-            print(f"├── Region: {story.get('story_region', 'N/A')}")
-            print(f"├── Author: {story.get('author', 'N/A')}")
-            print(f"├── Date: {story.get('story_date', 'N/A')}")
-            print(f"├── Details: {story.get('story_details', 'N/A')}")
-            print(f"├── Agency Name: {story.get('agency_name', 'N/A')}")
-            print(f"├── Agency URL: {story.get('agency_url', 'N/A')}")
-            print(f"└── Agency Code: {story.get('agency_code', 'N/A')}\n")
+
+    print_all_stories(all_stories)
 
 
 def delete_story(story_id):
