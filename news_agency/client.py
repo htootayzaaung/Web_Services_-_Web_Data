@@ -307,10 +307,32 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     if news_date != "*":
         try:
             user_date = datetime.datetime.strptime(news_date, "%d/%m/%Y").date()
-            all_stories = [story for story in all_stories if parse_date(story.get('story_date')) >= user_date]
+            filtered_stories = []
+
+            for story in all_stories:
+                # Check if 'story_date' key exists; if not, skip to the next story
+                if 'story_date' not in story or not story['story_date']:
+                    print(f"Warning: Missing 'story_date' for story {story.get('key', 'N/A')}. Skipping this story.")
+                    continue
+
+                try:
+                    # Proceed with parsing since 'story_date' exists
+                    story_date = parse_date(story['story_date'])
+                    if story_date is None:
+                        continue  # If parsing returns None, skip this story
+
+                    if story_date >= user_date:
+                        filtered_stories.append(story)
+                except ValueError as e:
+                    print(f"Error parsing date from story {story['key']}: {e}")
+                    continue  # Skip this story on error
+
+            all_stories = filtered_stories
+
         except ValueError as e:
             print(f"Error parsing user date: {e}")
             print("Invalid date format. Please enter the date in 'dd/mm/yyyy' format.")
+            return
 
     # Print the filtered stories
     print_all_stories(all_stories)
