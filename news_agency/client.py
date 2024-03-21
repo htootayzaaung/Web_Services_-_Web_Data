@@ -227,6 +227,7 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     # Initialize session and stories list
     session = requests.Session()
     all_stories = []
+    agency_found = False  # Flag to track if the specified agency is found
 
     successful_fetches = 0
     attempted_agencies = set()
@@ -264,6 +265,7 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     if id:
         for url, details in all_agency_details.items():
             if details['code'] == id:
+                agency_found = True
                 stories = fetch_stories(session, details['full_url'])
                 for story in stories:
                     story.update({
@@ -273,6 +275,11 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
                     })
                 all_stories.extend(stories)
                 break
+            
+        if not agency_found:
+            print(f"No news stories found for agency ID: {id}.")
+            return  # Early return to skip fetching from random agencies
+        
     if category != "*":
         all_stories = [story for story in all_stories if story.get('story_cat') == category]
     if region != "*":
