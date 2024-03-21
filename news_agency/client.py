@@ -4,6 +4,7 @@ import sys
 import datetime
 import shlex
 import concurrent.futures
+import random
 
 session = requests.Session()
 current_user = {'is_logged_in': False, 'username': None, 'name': None, 'api_base_url': None}
@@ -203,8 +204,7 @@ def fetch_stories(session, url):
         return []
 
 def get_news_from_service(id=None, category="*", region="*", news_date="*"):
-    pythonanywhere_urls = []
-    agency_details = {}
+    all_agency_details = {}
 
     # Fetching agency URLs and details
     url = "http://newssites.pythonanywhere.com/api/directory/"
@@ -212,39 +212,52 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     if response.status_code == 200:
         agencies = response.json()
         
-        # Limit the number of agencies to 20
-        agencies = agencies[:20]
+        # Populate all_agency_details with all potential agencies
         for agency in agencies:
             if ".pythonanywhere.com" in agency['url']:
                 base_url = agency['url'].rstrip("/")
                 full_url = base_url + "/api/stories"
-                pythonanywhere_urls.append(full_url)
-                agency_details[base_url] = {
+                all_agency_details[base_url] = {
                     'name': agency['agency_name'],
                     'url': agency['url'],
-                    'code': agency['agency_code']
+                    'code': agency['agency_code'],
+                    'full_url': full_url
                 }
 
+    # Initialize session and stories list
     session = requests.Session()
     all_stories = []
-    # Use ThreadPoolExecutor to fetch stories in parallel
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pythonanywhere_urls)) as executor:
-        future_to_url = {executor.submit(fetch_stories, session, url): url for url in pythonanywhere_urls}
-        for future in concurrent.futures.as_completed(future_to_url):
-            url = future_to_url[future]
-            try:
-                stories = future.result()
-                for story in stories:
-                    story_base_url = url.rsplit('/api/stories', 1)[0]
-                    agency_info = agency_details.get(story_base_url, {'name': 'N/A', 'url': 'N/A', 'code': 'N/A'})
-                    story.update({
-                        'agency_name': agency_info['name'],
-                        'agency_url': agency_info['url'],
-                        'agency_code': agency_info['code']
-                    })
-                all_stories.extend(stories)
-            except Exception as exc:
-                print('%r generated an exception: %s' % (url, exc))
+
+    successful_fetches = 0
+    attempted_agencies = set()
+
+    # Continue attempting to fetch until 20 successful fetches or no more agencies
+    while successful_fetches < 20 and len(attempted_agencies) < len(all_agency_details):
+        # Randomly select agencies not yet attempted, up to the number needed to reach 20
+        remaining_agencies = [url for url in all_agency_details.keys() if url not in attempted_agencies]
+        needed = 20 - successful_fetches
+        selected_agencies = random.sample(remaining_agencies, min(len(remaining_agencies), needed))
+
+        # Use ThreadPoolExecutor to fetch stories in parallel from selected agencies
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(selected_agencies)) as executor:
+            future_to_url = {executor.submit(fetch_stories, session, all_agency_details[url]['full_url']): url for url in selected_agencies}
+            for future in concurrent.futures.as_completed(future_to_url):
+                url = future_to_url[future]
+                attempted_agencies.add(url)  # Mark this agency as attempted
+                try:
+                    stories = future.result()
+                    if stories:  # Only count as successful if stories were actually fetched
+                        successful_fetches += 1
+                        agency_info = all_agency_details[url]
+                        for story in stories:
+                            story.update({
+                                'agency_name': agency_info['name'],
+                                'agency_url': agency_info['url'],
+                                'agency_code': agency_info['code']
+                            })
+                        all_stories.extend(stories)
+                except Exception as exc:
+                    print(f'{url} generated an exception: {exc}')
 
     # Client-side filtering
     if id:
@@ -282,7 +295,6 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
             print(f"Error parsing user date: {e}")
             print("Invalid date format. Please enter the date in 'dd/mm/yyyy' format.")
             return
-
         
     # Printing the stories
     if not all_stories:
