@@ -211,6 +211,9 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     response = requests.get(url)
     if response.status_code == 200:
         agencies = response.json()
+        
+        # Limit the number of agencies to 20
+        agencies = agencies[:20]
         for agency in agencies:
             if ".pythonanywhere.com" in agency['url']:
                 base_url = agency['url'].rstrip("/")
