@@ -133,3 +133,5 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = '$*w#kppp+l%@oy+g4p8^mrgoojk3#0ly&br!5+jbe0cqbs486c'
+
+CSRF_TRUSTED_ORIGINS = ['https://sc21hta.pythonanywhere.com']

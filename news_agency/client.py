@@ -337,7 +337,6 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     # Print the filtered stories
     print_all_stories(all_stories)
 
-
 def delete_story(story_id):
     global current_user, session
 
@@ -345,22 +344,24 @@ def delete_story(story_id):
         print("You must be logged in to delete a story.")
         return
 
-    # Use the api_base_url from current_user for dynamic API URL handling
-    api_base_url = current_user['api_base_url']
-    delete_url = f"{api_base_url}stories/{story_id}" if api_base_url.endswith('/') else f"{api_base_url}/stories/{story_id}"
+    api_base_url = current_user['api_base_url'].rstrip('/')
+    delete_url = f"{api_base_url}/api/stories/{story_id}"
 
-    # Retrieve CSRF token from session cookies
+    # Attempt to retrieve CSRF token from session cookies
     csrf_token = session.cookies.get('csrftoken')
 
-    # Include CSRF token in request headers
-    headers = {'X-CSRFToken': csrf_token} if csrf_token else {}
+    headers = {
+        'X-CSRFToken': csrf_token,
+        'Referer': api_base_url  # Setting the Referer header manually
+    }
 
     response = session.delete(delete_url, headers=headers)
 
     if response.status_code == 200:
         print("Story deleted successfully.")
     else:
-        print("Failed to delete the story:", response.text)
+        # Improved error handling
+        print(f"Failed to delete the story. Status code: {response.status_code}. Reason: {response.text}")
 
 def list_agencies():
     url = "http://newssites.pythonanywhere.com/api/directory/"
@@ -413,9 +414,15 @@ def main():
             else:
                 print("Invalid command format. Expected format is 'login <API URL>'.")
         elif command_parts[0] == 'logout':
-            logout()
+            if len(command_parts) == 1:
+                logout()
+            else:
+                print("Invalid command format. Expected format is 'logout'.")
         elif command_parts[0] == 'post':
-            post_story()
+            if len(command_parts) == 1:
+                post_story()
+            else:
+                print("Invalid command format. Expected format is 'post'.")
         elif command_parts[0] == 'news':
             news_args, invalid_keyword_found, format_error_found = parse_news_args(command_parts[1:])
             if not invalid_keyword_found and not format_error_found:
@@ -429,9 +436,16 @@ def main():
             else:
                 print("Invalid command format. Expected format is 'delete <story_id>'.")
         elif command_parts[0] == 'list':
-            list_agencies()
+            if len(command_parts) == 1:
+                list_agencies()
+            else:
+                print("Invalid command format. Expected format is 'list'.")
         elif command_parts[0] == 'exit':
-            break
+            if len(command_parts) == 1:
+                print("Exiting the program.")
+                break
+            else:
+                print("Invalid command format. Expected format is 'exit'.")
         else:
             print("Unknown command.")
 
