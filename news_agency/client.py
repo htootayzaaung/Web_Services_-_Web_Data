@@ -245,10 +245,10 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
     # Initialize session and stories list
     session = requests.Session()
     all_stories = []
+    agency_found = False  # Flag to track if the specified agency is found
 
-    # If an ID is specified, fetch news only from that agency
+    # If ID is provided, fetch stories only from that agency
     if id:
-        agency_found = False
         for url, details in all_agency_details.items():
             if details['code'] == id:
                 agency_found = True
@@ -264,12 +264,16 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
             
         if not agency_found:
             print(f"No news stories found for agency ID: {id}.")
-            return  # Early return to skip fetching from random agencies
-    else:
-        # Randomly select agencies if no ID is specified
+            return  # Early return if the agency is not found
+        
+    # If no ID is provided or the agency is not found, fetch from random 20 agencies
+    if not id or not agency_found:
         successful_fetches = 0
         attempted_agencies = set()
+
+        # Continue attempting to fetch until 20 successful fetches or no more agencies
         while successful_fetches < 20 and len(attempted_agencies) < len(all_agency_details):
+            # Randomly select agencies not yet attempted, up to the number needed to reach 20
             remaining_agencies = [url for url in all_agency_details.keys() if url not in attempted_agencies]
             needed = 20 - successful_fetches
             selected_agencies = random.sample(remaining_agencies, min(len(remaining_agencies), needed))
@@ -294,8 +298,8 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
                             all_stories.extend(stories)
                     except Exception as exc:
                         print(f'{url} generated an exception: {exc}')
-
-    # Client-side filtering
+        
+    # Apply filtering based on category, region, and news date
     if category != "*":
         all_stories = [story for story in all_stories if story.get('story_cat') == category]
     if region != "*":
@@ -307,8 +311,8 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
         except ValueError as e:
             print(f"Error parsing user date: {e}")
             print("Invalid date format. Please enter the date in 'dd/mm/yyyy' format.")
-            return
 
+    # Print the filtered stories
     print_all_stories(all_stories)
 
 
