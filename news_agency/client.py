@@ -260,8 +260,19 @@ def get_news_from_service(id=None, category="*", region="*", news_date="*"):
                     print(f'{url} generated an exception: {exc}')
 
     # Client-side filtering
+    # If an ID is specified, fetch directly from that agency
     if id:
-        all_stories = [story for story in all_stories if story.get('agency_code') == id]
+        for url, details in all_agency_details.items():
+            if details['code'] == id:
+                stories = fetch_stories(session, details['full_url'])
+                for story in stories:
+                    story.update({
+                        'agency_name': details['name'],
+                        'agency_url': details['url'],
+                        'agency_code': details['code']
+                    })
+                all_stories.extend(stories)
+                break
     if category != "*":
         all_stories = [story for story in all_stories if story.get('story_cat') == category]
     if region != "*":
