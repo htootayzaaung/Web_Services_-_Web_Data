@@ -88,19 +88,16 @@ def stories_view(request):
 @api_view(['DELETE'])
 def delete_story(request, pk):
     if not request.user.is_authenticated:
-        # User not authenticated
         return HttpResponse("User not authenticated.", status=status.HTTP_401_UNAUTHORIZED, content_type="text/plain")
     
     try:
         story = NewsStory.objects.get(pk=pk)
     except NewsStory.DoesNotExist:
-        # Story not found
-        return HttpResponse("Story not found.", status=status.HTTP_503_SERVICE_UNAVAILABLE, content_type="text/plain")
+        return HttpResponse("Story not found.", status=status.HTTP_404_NOT_FOUND, content_type="text/plain")
     
-    if story.author != request.user:
-        # User not authorized to delete the story
-        return HttpResponse("Unauthorized to delete this story.", status=status.HTTP_503_SERVICE_UNAVAILABLE, content_type="text/plain")
+    # Assuming the username in Author model matches the username of the User model
+    if story.author.username != request.user.username:
+        return HttpResponse("Unauthorized to delete this story.", status=status.HTTP_403_FORBIDDEN, content_type="text/plain")
     
-    # Delete the story
     story.delete()
     return HttpResponse("Story deleted successfully.", status=status.HTTP_200_OK, content_type="text/plain")
