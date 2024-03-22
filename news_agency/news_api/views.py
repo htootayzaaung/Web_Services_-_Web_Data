@@ -11,6 +11,9 @@ from django.http import HttpResponse
 import datetime
 from datetime import date
 
+def root_view(request):
+    return HttpResponse("Welcome to the News Agency API.")
+
 #Log In
 @api_view(['POST'])
 def login_view(request):
