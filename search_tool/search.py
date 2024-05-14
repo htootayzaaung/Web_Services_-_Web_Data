@@ -4,8 +4,22 @@ from bs4 import BeautifulSoup
 from collections import defaultdict, Counter
 import json
 import os
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urldefrag
 import re
+
+def normalize_url(url):
+    # Remove URL fragment and normalize
+    url = urldefrag(url)[0]
+    parsed_url = urlparse(url)
+    normalized_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
+    # Ensure consistent trailing slash
+    if normalized_url.endswith('/'):
+        normalized_url = normalized_url[:-1]
+    return normalized_url
+
+def clean_text(text):
+    # Strip leading and trailing whitespace and collapse multiple spaces
+    return ' '.join(text.split())
 
 def crawl_website(start_url, delay=0, existing_urls=None):
     if existing_urls is None:
@@ -16,7 +30,8 @@ def crawl_website(start_url, delay=0, existing_urls=None):
 
     while urls_to_crawl:
         url = urls_to_crawl.pop(0)
-        if url in crawled_urls:
+        normalized_url = normalize_url(url)
+        if normalized_url in crawled_urls:
             continue
 
         print(f"Crawling URL: {url}")
@@ -25,15 +40,18 @@ def crawl_website(start_url, delay=0, existing_urls=None):
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             text = soup.get_text(separator=' ')
-            if text:
-                page_contents.append((url, text))
+            cleaned_text = clean_text(text)
+            if cleaned_text:
+                page_contents.append((normalized_url, cleaned_text))
+                print(f"Text extracted from {normalized_url}: {cleaned_text[:100]}...")  # Debug: Show a snippet of extracted text
 
-            crawled_urls.add(url)
+            crawled_urls.add(normalized_url)
             for link in soup.find_all('a'):
                 new_url = link.get('href')
                 if new_url:
                     new_url = urljoin(start_url, new_url)
-                    if new_url not in crawled_urls and urlparse(new_url).netloc == urlparse(start_url).netloc:
+                    normalized_new_url = normalize_url(new_url)
+                    if normalized_new_url not in crawled_urls and urlparse(new_url).netloc == urlparse(start_url).netloc:
                         urls_to_crawl.append(new_url)
 
             time.sleep(delay)
@@ -83,7 +101,7 @@ def print_index(word, index):
     if word in index:
         print(f"Inverted index for '{word}':")
         for url, count in index[word].items():
-            print(f"  - {url} {count} occurrences")
+            print(f"  - {url}: {count} occurrences")
     else:
         print(f"No entries found for '{word}'.")
 
