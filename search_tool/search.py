@@ -6,6 +6,11 @@ import json
 import os
 from urllib.parse import urljoin, urlparse, urldefrag
 import re
+import nltk
+nltk.download('stopwords')
+from nltk.corpus import stopwords
+
+STOP_WORDS = set(stopwords.words('english'))
 
 def normalize_url(url):
     # Remove URL fragment and normalize
@@ -61,14 +66,13 @@ def crawl_website(start_url, delay=0, existing_urls=None):
     return page_contents
 
 def build_inverted_index(page_contents):
-    inverted_index = defaultdict(lambda: defaultdict(int))
+    inverted_index = defaultdict(lambda: defaultdict(list))
     word_split_pattern = re.compile(r'\b\w+\b')
 
     for url, content in page_contents:
         words = word_split_pattern.findall(content.lower())
-        word_counts = Counter(words)
-        for word, count in word_counts.items():
-            inverted_index[word][url] = count
+        for position, word in enumerate(words):
+            inverted_index[word][url].append(position)
 
     print(f"Built inverted index with {len(inverted_index)} unique words.")
     return inverted_index
@@ -81,42 +85,71 @@ def save_index(index, file_path):
 def load_index(file_path):
     if not os.path.exists(file_path):
         print(f"{file_path} does not exist. Initializing an empty index.")
-        return defaultdict(lambda: defaultdict(int))
+        return defaultdict(lambda: defaultdict(list))
     try:
         with open(file_path, 'r') as f:
             return json.load(f)
     except (json.JSONDecodeError, ValueError):
         print(f"Failed to decode {file_path}. Clearing its contents and initializing a new index.")
         clear_index(file_path)
-        return defaultdict(lambda: defaultdict(int))
+        return defaultdict(lambda: defaultdict(list))
 
 def merge_indices(existing_index, new_index):
     for word, urls in new_index.items():
-        for url, count in urls.items():
-            existing_index[word][url] += count
+        for url, positions in urls.items():
+            existing_index[word][url].extend(positions)
     return existing_index
 
 def print_index(word, index):
     word = word.lower()
     if word in index:
         print(f"Inverted index for '{word}':")
-        for url, count in index[word].items():
-            print(f"  - {url}: {count} occurrences")
+        for url, positions in index[word].items():
+            print(f"  - {url}: {len(positions)} occurrences at positions {positions}")
     else:
         print(f"No entries found for '{word}'.")
 
 def find_pages(phrase, index):
     words = phrase.lower().split()
-    if all(word in index for word in words):
-        pages = set(index[words[0]].keys())
-        for word in words[1:]:
-            pages &= set(index[word].keys())
-        if pages:
-            print(f"Pages containing '{phrase}':")
-            for page in pages:
-                print(f"  - {page}")
-        else:
-            print(f"No pages found containing the phrase '{phrase}'.")
+    if all(word in STOP_WORDS for word in words):
+        print(f"No pages found containing only stop words.")
+        return
+    
+    valid_words = [word for word in words if word not in STOP_WORDS]
+    if not valid_words:
+        print(f"No pages found containing the phrase '{phrase}'.")
+        return
+    
+    page_scores = defaultdict(lambda: {'count': 0, 'positions': [], 'consecutive': False})
+
+    for word in valid_words:
+        if word in index:
+            for url, positions in index[word].items():
+                page_scores[url]['count'] += len(positions)
+                page_scores[url]['positions'].append(positions)
+
+    # Separate pages into those containing all words and those that don't
+    full_match_pages = {url: data for url, data in page_scores.items() if len(data['positions']) == len(valid_words)}
+    partial_match_pages = {url: data for url, data in page_scores.items() if len(data['positions']) < len(valid_words)}
+
+    # Sort full match pages based on frequency and position proximity
+    def score_page(data):
+        total_score = data['count']
+        for positions in data['positions']:
+            if all(abs(positions[i] - positions[i-1]) == 1 for i in range(1, len(positions))):
+                total_score += 1000  # High score for consecutive words
+        return total_score
+
+    sorted_full_match_pages = sorted(full_match_pages.items(), key=lambda item: score_page(item[1]), reverse=True)
+    sorted_partial_match_pages = sorted(partial_match_pages.items(), key=lambda item: item[1]['count'], reverse=True)
+
+    # Combine results
+    sorted_pages = sorted_full_match_pages + sorted_partial_match_pages
+
+    if sorted_pages:
+        print(f"Pages containing '{phrase}':")
+        for page, data in sorted_pages:
+            print(f"  - {page} (score: {score_page(data):.2f})")
     else:
         print(f"No pages found containing the phrase '{phrase}'.")
 
