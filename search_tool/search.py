@@ -5,10 +5,11 @@ from collections import defaultdict
 import json
 import os
 from urllib.parse import urljoin, urlparse, urldefrag
-import re
 import nltk
 nltk.download('stopwords')
+nltk.download('punkt')
 from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
 
 STOP_WORDS = set(stopwords.words('english'))
 
@@ -63,12 +64,12 @@ def crawl_website(start_url, delay=0, existing_urls=None):
 
 def build_inverted_index(page_contents):
     inverted_index = defaultdict(lambda: defaultdict(list))
-    word_split_pattern = re.compile(r'\b\w+\b')
 
     for url, content in page_contents:
-        words = word_split_pattern.findall(content.lower())
+        words = word_tokenize(content.lower())
         for position, word in enumerate(words):
-            inverted_index[word][url].append(position)
+            if word.isalnum():  # Ensure the word is alphanumeric
+                inverted_index[word][url].append(position)
 
     print(f"Built inverted index with {len(inverted_index)} unique words.")
     return inverted_index
@@ -100,7 +101,7 @@ def merge_indices(existing_index, new_index):
     return existing_index
 
 def find_pages(phrase, index):
-    words = phrase.lower().split()
+    words = word_tokenize(phrase.lower())
     if all(word in STOP_WORDS for word in words):
         print(f"No pages found containing only stop words.")
         return
@@ -115,7 +116,9 @@ def find_pages(phrase, index):
         'positions': defaultdict(list),
         'phrase_count': 0,
         'phrase_positions': [],
-        'individual_counts': defaultdict(int)
+        'individual_counts': defaultdict(int),
+        'consecutive_counts': defaultdict(int),
+        'consecutive_positions': defaultdict(list)
     })
 
     # Populate the page_scores with positions and counts
@@ -126,7 +129,7 @@ def find_pages(phrase, index):
                 page_scores[url]['positions'][word].extend(positions)
                 page_scores[url]['individual_counts'][word] += len(positions)
 
-    # Function to count the occurrences of the phrase
+    # Function to count the occurrences of the phrase and consecutive pairs
     def count_phrase_occurrences(page_scores, word_count):
         for url, data in page_scores.items():
             word_positions = [sorted(data['positions'][word]) for word in valid_words]
@@ -155,16 +158,29 @@ def find_pages(phrase, index):
             data['phrase_count'] = len(phrase_positions)
             data['phrase_positions'] = phrase_positions
 
+            # Count consecutive word pairs
+            for i in range(word_count - 1):
+                pair_positions = []
+                for pos in word_positions[i]:
+                    if (pos + 1) in word_positions[i + 1]:
+                        pair_positions.append(pos)
+                pair = f"{valid_words[i]} {valid_words[i + 1]}"
+                data['consecutive_counts'][pair] = len(pair_positions)
+                data['consecutive_positions'][pair] = pair_positions
+
     count_phrase_occurrences(page_scores, len(valid_words))
 
     # Collect phrase and individual word results
     phrase_results = []
     individual_results = []
+    consecutive_results = []
 
     for url, data in page_scores.items():
         if data['phrase_count'] > 0:
             phrase_results.append((url, data))
-        else:
+        if len(valid_words) >= 3:
+            consecutive_results.append((url, data))
+        if data['count'] > 0:
             individual_results.append((url, data))
 
     # Sort and print phrase results
@@ -177,7 +193,15 @@ def find_pages(phrase, index):
         ))
         print(f"Pages containing '{phrase}':")
         for page, data in phrase_results:
-            print(f"  - {page}\n    │\n    └──('{phrase}' count: {data['phrase_count']}, positions: {data['phrase_positions']})\n")
+            print(f"  - {page}\n    │\n    └──('{phrase}' count: {data['phrase_count']}, positions: {data['phrase_positions']})")
+
+    # Sort and print consecutive results
+    if consecutive_results and len(valid_words) >= 3:
+        print(f"\nPages containing phrases from '{phrase}':")
+        for page, data in consecutive_results:
+            for pair, count in data['consecutive_counts'].items():
+                if count > 0:
+                    print(f"  - {page}\n    │\n    └──('{pair}' count: {count}, positions: {data['consecutive_positions'][pair]})")
 
     # Sort and print individual word results
     if individual_results:
@@ -191,7 +215,7 @@ def find_pages(phrase, index):
                 continue
             if data['count'] > 0:
                 word_count_details = ", ".join([f"{word}: {data['individual_counts'][word]}, positions: {data['positions'][word]}" for word in valid_words])
-                print(f"  - {page}\n    │\n    └──(total count: {data['count']}, {word_count_details})\n")
+                print(f"  - {page}\n    │\n    └──(total count: {data['count']}, {word_count_details})")
 
 
 def print_index(word, index):
