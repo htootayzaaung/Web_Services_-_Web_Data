@@ -110,44 +110,76 @@ def find_pages(phrase, index):
         print(f"No pages found containing the phrase '{phrase}'.")
         return
 
-    page_scores = defaultdict(lambda: {'count': 0, 'positions': [], 'phrase_count': 0, 'individual_counts': defaultdict(int)})
+    page_scores = defaultdict(lambda: {
+        'count': 0,
+        'positions': defaultdict(list),
+        'phrase_count': 0,
+        'phrase_positions': [],
+        'individual_counts': defaultdict(int)
+    })
 
     for word in valid_words:
         if word in index:
             for url, positions in index[word].items():
                 page_scores[url]['count'] += len(positions)
-                page_scores[url]['positions'].extend(positions)
+                page_scores[url]['positions'][word].extend(positions)
                 page_scores[url]['individual_counts'][word] += len(positions)
 
-    def count_phrase_occurrences(positions, word_count):
-        positions.sort()
-        phrase_count = 0
-        for i in range(len(positions) - word_count + 1):
-            if all(positions[i + j] == positions[i] + j for j in range(word_count)):
-                phrase_count += 1
-        return phrase_count
+    def count_phrase_occurrences(page_scores, word_count):
+        for url, data in page_scores.items():
+            word_positions = [sorted(data['positions'][word]) for word in valid_words]
+            if any(len(pos) == 0 for pos in word_positions):
+                continue
+
+            phrase_positions = []
+            pos_indices = [0] * word_count
+
+            while True:
+                current_positions = [word_positions[i][pos_indices[i]] for i in range(word_count)]
+                if all((current_positions[0] + i) == current_positions[i] for i in range(word_count)):
+                    phrase_positions.append(current_positions[0])
+                    for i in range(word_count):
+                        pos_indices[i] += 1
+                        if pos_indices[i] >= len(word_positions[i]):
+                            pos_indices[i] = float('inf')
+
+                min_pos = min(current_positions)
+                min_index = current_positions.index(min_pos)
+                pos_indices[min_index] += 1
+
+                if any(pos_indices[i] >= len(word_positions[i]) for i in range(word_count)):
+                    break
+
+            data['phrase_count'] = len(phrase_positions)
+            data['phrase_positions'] = phrase_positions
+
+    count_phrase_occurrences(page_scores, len(valid_words))
 
     phrase_results = []
+    individual_results = []
+
     for url, data in page_scores.items():
-        data['phrase_count'] = count_phrase_occurrences(data['positions'], len(valid_words))
-        phrase_results.append((url, data))
+        if data['phrase_count'] > 0:
+            phrase_results.append((url, data))
+        else:
+            individual_results.append((url, data))
 
-    sorted_phrase_results = sorted(phrase_results, key=lambda item: (-item[1]['phrase_count'], -item[1]['count'], item[1]['positions'][0] if item[1]['positions'] else float('inf')))
-    sorted_individual_results = sorted(phrase_results, key=lambda item: (-item[1]['count'], item[1]['positions'][0] if item[1]['positions'] else float('inf')))
-
-    if sorted_phrase_results:
+    if phrase_results:
+        phrase_results.sort(key=lambda item: (min(item[1]['phrase_positions']), -item[1]['phrase_count'], -item[1]['count']))
         print(f"Pages containing '{phrase}':")
-        for page, data in sorted_phrase_results:
-            print(f"  - {page}\n    ('{phrase}' count: {data['phrase_count']}, total count: {data['count']}, positions: {data['positions']})")
-    else:
-        print(f"No pages found containing the phrase '{phrase}'.")
+        for page, data in phrase_results:
+            print(f"  - {page}\n    │\n    └──('{phrase}' count: {data['phrase_count']}, positions: {data['phrase_positions']})\n")
 
-    if sorted_individual_results:
+    if individual_results:
+        individual_results.sort(key=lambda item: (min([pos for positions in item[1]['positions'].values() for pos in positions]), -item[1]['count']))
         print(f"\nPages containing individual words from '{phrase}':")
-        for page, data in sorted_individual_results:
+        for page, data in individual_results:
+            if any(page == result[0] for result in phrase_results):
+                continue
             if data['count'] > 0:
-                word_count_details = ", ".join([f"{word}: {data['individual_counts'][word]}" for word in valid_words])
-                print(f"  - {page}\n    (total count: {data['count']}, {word_count_details}, positions: {data['positions']})")
+                word_count_details = ", ".join([f"{word}: {data['individual_counts'][word]}, positions: {data['positions'][word]}" for word in valid_words])
+                print(f"  - {page}\n    │\n    └──(total count: {data['count']}, {word_count_details})\n")
+
 
 def print_index(word, index):
     word = word.lower()
