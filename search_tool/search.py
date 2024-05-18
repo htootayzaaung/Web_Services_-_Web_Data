@@ -104,21 +104,18 @@ def print_index(word, index):
     if word in index:
         print(f"Inverted index for '{word}':")
         for url, positions in index[word].items():
-            print(f"  - {url}: {len(positions)} occurrences at positions {positions}")
+            print(f"  - {url} ({len(positions)} occurrences at positions {positions})")
     else:
         print(f"No entries found for '{word}'.")
 
 def find_pages(phrase, index):
     words = phrase.lower().split()
-    if all(word in STOP_WORDS for word in words):
-        print(f"No pages found containing only stop words.")
-        return
-    
     valid_words = [word for word in words if word not in STOP_WORDS]
+    
     if not valid_words:
         print(f"No pages found containing the phrase '{phrase}'.")
         return
-    
+
     page_scores = defaultdict(lambda: {'count': 0, 'positions': [], 'consecutive': False})
 
     for word in valid_words:
@@ -143,7 +140,7 @@ def find_pages(phrase, index):
     sorted_pages = sorted_full_match_pages + sorted_partial_match_pages
 
     if sorted_pages:
-        print(f"Pages containing '{phrase}':")
+        print(f"Pages containing '{' '.join(valid_words)}':")
         for page, data in sorted_pages:
             print(f"  - {page} (score: {score_page(data):.2f})")
     else:
