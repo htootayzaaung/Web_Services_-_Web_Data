@@ -130,22 +130,24 @@ def find_pages(phrase, index):
     phrase_results = []
     for url, data in page_scores.items():
         data['phrase_count'] = count_phrase_occurrences(data['positions'], len(valid_words))
-        if data['phrase_count'] > 0:
-            phrase_results.append((url, data))
+        phrase_results.append((url, data))
 
-    if phrase_results:
-        phrase_results.sort(key=lambda item: (-item[1]['phrase_count'], -item[1]['count'], item[1]['positions'][0] if item[1]['positions'] else float('inf')))
+    sorted_phrase_results = sorted(phrase_results, key=lambda item: (-item[1]['phrase_count'], -item[1]['count'], item[1]['positions'][0] if item[1]['positions'] else float('inf')))
+    sorted_individual_results = sorted(phrase_results, key=lambda item: (-item[1]['count'], item[1]['positions'][0] if item[1]['positions'] else float('inf')))
+
+    if sorted_phrase_results:
         print(f"Pages containing '{phrase}':")
-        for page, data in phrase_results:
+        for page, data in sorted_phrase_results:
             print(f"  - {page}\n    ('{phrase}' count: {data['phrase_count']}, total count: {data['count']}, positions: {data['positions']})")
     else:
-        individual_results = sorted(page_scores.items(), key=lambda item: (-item[1]['count'], item[1]['positions'][0] if item[1]['positions'] else float('inf')))
-        print(f"Pages containing individual words from '{phrase}':")
-        for page, data in individual_results:
+        print(f"No pages found containing the phrase '{phrase}'.")
+
+    if sorted_individual_results:
+        print(f"\nPages containing individual words from '{phrase}':")
+        for page, data in sorted_individual_results:
             if data['count'] > 0:
                 word_count_details = ", ".join([f"{word}: {data['individual_counts'][word]}" for word in valid_words])
                 print(f"  - {page}\n    (total count: {data['count']}, {word_count_details}, positions: {data['positions']})")
-
 
 def print_index(word, index):
     word = word.lower()
