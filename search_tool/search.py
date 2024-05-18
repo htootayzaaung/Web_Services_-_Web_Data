@@ -118,6 +118,7 @@ def find_pages(phrase, index):
         'individual_counts': defaultdict(int)
     })
 
+    # Populate the page_scores with positions and counts
     for word in valid_words:
         if word in index:
             for url, positions in index[word].items():
@@ -125,6 +126,7 @@ def find_pages(phrase, index):
                 page_scores[url]['positions'][word].extend(positions)
                 page_scores[url]['individual_counts'][word] += len(positions)
 
+    # Function to count the occurrences of the phrase
     def count_phrase_occurrences(page_scores, word_count):
         for url, data in page_scores.items():
             word_positions = [sorted(data['positions'][word]) for word in valid_words]
@@ -155,6 +157,7 @@ def find_pages(phrase, index):
 
     count_phrase_occurrences(page_scores, len(valid_words))
 
+    # Collect phrase and individual word results
     phrase_results = []
     individual_results = []
 
@@ -164,14 +167,24 @@ def find_pages(phrase, index):
         else:
             individual_results.append((url, data))
 
+    # Sort and print phrase results
     if phrase_results:
-        phrase_results.sort(key=lambda item: (min(item[1]['phrase_positions']), -item[1]['phrase_count'], -item[1]['count']))
+        phrase_results.sort(key=lambda item: (
+            -item[1]['phrase_count'],
+            min(item[1]['phrase_positions']),
+            -item[1]['count'],
+            min([pos for positions in item[1]['positions'].values() for pos in positions])
+        ))
         print(f"Pages containing '{phrase}':")
         for page, data in phrase_results:
             print(f"  - {page}\n    │\n    └──('{phrase}' count: {data['phrase_count']}, positions: {data['phrase_positions']})\n")
 
+    # Sort and print individual word results
     if individual_results:
-        individual_results.sort(key=lambda item: (min([pos for positions in item[1]['positions'].values() for pos in positions]), -item[1]['count']))
+        individual_results.sort(key=lambda item: (
+            -item[1]['count'],
+            min([pos for positions in item[1]['positions'].values() for pos in positions])
+        ))
         print(f"\nPages containing individual words from '{phrase}':")
         for page, data in individual_results:
             if any(page == result[0] for result in phrase_results):
@@ -194,7 +207,6 @@ def print_index(word, index):
             print(f"  - {url}\n    (count: {len(positions)}, positions: {positions})")
     else:
         print(f"No entries found for '{word}'. The 'print' command only supports single words, not phrases. Use 'find' for phrases.")
-
 
 def clear_index(file_path):
     if os.path.exists(file_path):
