@@ -48,7 +48,6 @@ def crawl_website(start_url, delay=0, existing_urls=None):
             cleaned_text = clean_text(text)
             if cleaned_text:
                 page_contents.append((normalized_url, cleaned_text))
-                print(f"Text extracted from {normalized_url}: {cleaned_text[:100]}...")  # Debug: Show a snippet of extracted text
 
             crawled_urls.add(normalized_url)
             for link in soup.find_all('a'):
@@ -85,14 +84,18 @@ def save_index(index, file_path):
 def load_index(file_path):
     if not os.path.exists(file_path):
         print(f"{file_path} does not exist. Initializing an empty index.")
-        return defaultdict(lambda: defaultdict(list))
+        return defaultdict(lambda: defaultdict(list)), "Initialized empty index"
+    
     try:
         with open(file_path, 'r') as f:
-            return json.load(f)
-    except (json.JSONDecodeError, ValueError):
-        print(f"Failed to decode {file_path}. Clearing its contents and initializing a new index.")
+            index = json.load(f, object_hook=lambda d: defaultdict(list, d))  # Properly convert to defaultdict
+            print(f"Index loaded from {file_path}.")
+            return index, "Loaded successfully"
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"Failed to decode {file_path} due to {str(e)}. Clearing its contents and initializing a new index.")
         clear_index(file_path)
-        return defaultdict(lambda: defaultdict(list))
+        return defaultdict(lambda: defaultdict(list)), "Failed to load; initialized new index"
+
 
 def merge_indices(existing_index, new_index):
     for word, urls in new_index.items():
@@ -155,8 +158,7 @@ def find_pages(phrase, index):
 
 def clear_index(file_path):
     if os.path.exists(file_path):
-        with open(file_path, 'w') as f:
-            f.write('')
+        os.remove(file_path)
     print(f"Cleared the index file {file_path}")
 
 def print_usage():
@@ -179,30 +181,21 @@ def main():
         if command == 'build':
             start_url = "https://quotes.toscrape.com"
             print("Starting the build process...")
-
-            # Load existing index and get existing URLs
-            existing_index = load_index(index_file)
+            existing_index, _ = load_index(index_file)
             existing_urls = {url for urls in existing_index.values() for url in urls}
-
-            # Crawl website and merge with existing data
             pages = crawl_website(start_url, delay=0, existing_urls=existing_urls)
             if not pages:
                 print("No new pages found. Index remains unchanged.")
             else:
-                print("Crawling completed. Building the inverted index...")
                 new_index = build_inverted_index(pages)
-
-                # Merge new index with existing index
                 index = merge_indices(existing_index, new_index)
                 save_index(index, index_file)
-                print("Inverted index built and saved to index.json.")
         elif command == 'load':
-            index = load_index(index_file)
-            print("Index loaded from index.json.")
+            index, message = load_index(index_file)
+            print(message)
         elif command.startswith('print'):
             if index is None:
                 print("Index not loaded. Use 'load' command first.")
-                print_usage()
                 continue
             try:
                 _, word = command.split(maxsplit=1)
@@ -212,7 +205,6 @@ def main():
         elif command.startswith('find'):
             if index is None:
                 print("Index not loaded. Use 'load' command first.")
-                print_usage()
                 continue
             try:
                 _, phrase = command.split(maxsplit=1)
@@ -224,7 +216,7 @@ def main():
             break
         else:
             print("Invalid command.")
-        
+
         print_usage()  # Print usage instructions after each command
 
 if __name__ == "__main__":
