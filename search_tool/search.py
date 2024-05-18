@@ -110,29 +110,41 @@ def find_pages(phrase, index):
         print(f"No pages found containing the phrase '{phrase}'.")
         return
 
-    page_scores = defaultdict(lambda: {'count': 0, 'positions': []})
+    page_scores = defaultdict(lambda: {'count': 0, 'positions': [], 'phrase_count': 0, 'individual_counts': defaultdict(int)})
 
     for word in valid_words:
         if word in index:
             for url, positions in index[word].items():
                 page_scores[url]['count'] += len(positions)
                 page_scores[url]['positions'].extend(positions)
+                page_scores[url]['individual_counts'][word] += len(positions)
 
-    def sort_key(item):
-        url, data = item
-        positions = data['positions']
-        sequences = sum(1 for i in range(len(positions) - 1) if positions[i + 1] == positions[i] + 1)
-        return (-data['count'], -sequences, positions[0] if positions else float('inf'))
+    def count_phrase_occurrences(positions, word_count):
+        positions.sort()
+        phrase_count = 0
+        for i in range(len(positions) - word_count + 1):
+            if all(positions[i + j] == positions[i] + j for j in range(word_count)):
+                phrase_count += 1
+        return phrase_count
 
-    sorted_pages = sorted(page_scores.items(), key=sort_key)
+    phrase_results = []
+    for url, data in page_scores.items():
+        data['phrase_count'] = count_phrase_occurrences(data['positions'], len(valid_words))
+        if data['phrase_count'] > 0:
+            phrase_results.append((url, data))
 
-    if sorted_pages:
-        print(f"Pages containing '{' '.join(valid_words)}':")
-        for page, data in sorted_pages:
-            sequences = sum(1 for i in range(len(data['positions']) - 1) if data['positions'][i + 1] == data['positions'][i] + 1)
-            print(f"  - {page}\n    (count: {data['count']}, positions: {data['positions']})")
+    if phrase_results:
+        phrase_results.sort(key=lambda item: (-item[1]['phrase_count'], -item[1]['count'], item[1]['positions'][0] if item[1]['positions'] else float('inf')))
+        print(f"Pages containing '{phrase}':")
+        for page, data in phrase_results:
+            print(f"  - {page}\n    ('{phrase}' count: {data['phrase_count']}, total count: {data['count']}, positions: {data['positions']})")
     else:
-        print(f"No pages found containing the phrase '{phrase}'.")
+        individual_results = sorted(page_scores.items(), key=lambda item: (-item[1]['count'], item[1]['positions'][0] if item[1]['positions'] else float('inf')))
+        print(f"Pages containing individual words from '{phrase}':")
+        for page, data in individual_results:
+            if data['count'] > 0:
+                word_count_details = ", ".join([f"{word}: {data['individual_counts'][word]}" for word in valid_words])
+                print(f"  - {page}\n    (total count: {data['count']}, {word_count_details}, positions: {data['positions']})")
 
 
 def print_index(word, index):
