@@ -100,6 +100,11 @@ def merge_indices(existing_index, new_index):
     return existing_index
 
 def print_index(word, index):
+    # Check if the input is a phrase (contains spaces)
+    if ' ' in word:
+        print("The 'print' command only supports individual words, not phrases. Use 'find' for phrases.")
+        return
+
     word = word.lower()
     if word in index:
         print(f"Inverted index for '{word}':")
@@ -108,41 +113,63 @@ def print_index(word, index):
     else:
         print(f"No entries found for '{word}'.")
 
+
 def find_pages(phrase, index):
     words = phrase.lower().split()
-    valid_words = [word for word in words if word not in STOP_WORDS]
-    
-    if not valid_words:
-        print(f"No pages found containing the phrase '{phrase}'.")
+    if all(word in STOP_WORDS for word in words):
+        print("No pages found containing only stop words.")
         return
-
-    page_scores = defaultdict(lambda: {'count': 0, 'positions': [], 'consecutive': False})
+    
+    valid_words = [word for word in words if word not in STOP_WORDS]
+    if not valid_words:
+        print("No pages found containing the phrase '{phrase}'.")
+        return
+    
+    page_scores = defaultdict(lambda: {'count': 0, 'positions': [], 'consecutive': False, 'first_position': float('inf')})
 
     for word in valid_words:
         if word in index:
             for url, positions in index[word].items():
                 page_scores[url]['count'] += len(positions)
                 page_scores[url]['positions'].append(positions)
+                page_scores[url]['first_position'] = min(page_scores[url]['first_position'], positions[0])
 
+    # Check for pages that contain all words
     full_match_pages = {url: data for url, data in page_scores.items() if len(data['positions']) == len(valid_words)}
     partial_match_pages = {url: data for url, data in page_scores.items() if len(data['positions']) < len(valid_words)}
 
+    # Check for consecutive words and calculate positions
+    for url, data in full_match_pages.items():
+        flat_positions = [pos for sublist in data['positions'] for pos in sublist]
+        flat_positions.sort()
+        for i in range(len(flat_positions) - len(valid_words) + 1):
+            if flat_positions[i:i + len(valid_words)] == list(range(flat_positions[i], flat_positions[i] + len(valid_words))):
+                data['consecutive'] = True
+                break
+
     def score_page(data):
-        total_score = data['count']
-        for positions in data['positions']:
-            if all(abs(positions[i] - positions[i-1]) == 1 for i in range(1, len(positions))):
-                total_score += 1000
-        return total_score
+        # Primary sort by number of words matched (count)
+        # Secondary sort by frequency of words
+        # Tertiary sort by consecutive words
+        # Quaternary sort by first position
+        return (
+            len(data['positions']) == len(valid_words),  # all words present
+            data['consecutive'],  # consecutive words
+            data['count'],  # word frequency
+            -data['first_position']  # first position (negated for ascending order)
+        )
 
+    # Sort full match pages by score and positions
     sorted_full_match_pages = sorted(full_match_pages.items(), key=lambda item: score_page(item[1]), reverse=True)
-    sorted_partial_match_pages = sorted(partial_match_pages.items(), key=lambda item: item[1]['count'], reverse=True)
+    sorted_partial_match_pages = sorted(partial_match_pages.items(), key=lambda item: score_page(item[1]), reverse=True)
 
+    # Concatenate sorted results
     sorted_pages = sorted_full_match_pages + sorted_partial_match_pages
 
     if sorted_pages:
         print(f"Pages containing '{' '.join(valid_words)}':")
         for page, data in sorted_pages:
-            print(f"  - {page} (score: {score_page(data):.2f})")
+            print(f"  - {page}")
     else:
         print(f"No pages found containing the phrase '{phrase}'.")
 
