@@ -99,80 +99,55 @@ def merge_indices(existing_index, new_index):
             existing_index[word][url].extend(positions)
     return existing_index
 
-def print_index(word, index):
-    # Check if the input is a phrase (contains spaces)
-    if ' ' in word:
-        print("The 'print' command only supports individual words, not phrases. Use 'find' for phrases.")
-        return
-
-    word = word.lower()
-    if word in index:
-        print(f"Inverted index for '{word}':")
-        for url, positions in index[word].items():
-            print(f"  - {url} ({len(positions)} occurrences at positions {positions})")
-    else:
-        print(f"No entries found for '{word}'.")
-
-
 def find_pages(phrase, index):
     words = phrase.lower().split()
     if all(word in STOP_WORDS for word in words):
-        print("No pages found containing only stop words.")
+        print(f"No pages found containing only stop words.")
         return
-    
+
     valid_words = [word for word in words if word not in STOP_WORDS]
     if not valid_words:
-        print("No pages found containing the phrase '{phrase}'.")
+        print(f"No pages found containing the phrase '{phrase}'.")
         return
-    
-    page_scores = defaultdict(lambda: {'count': 0, 'positions': [], 'consecutive': False, 'first_position': float('inf')})
+
+    # Collect pages and positions for each word
+    page_scores = defaultdict(lambda: {'count': 0, 'positions': []})
 
     for word in valid_words:
         if word in index:
             for url, positions in index[word].items():
                 page_scores[url]['count'] += len(positions)
-                page_scores[url]['positions'].append(positions)
-                page_scores[url]['first_position'] = min(page_scores[url]['first_position'], positions[0])
+                page_scores[url]['positions'].extend(positions)
 
-    # Check for pages that contain all words
-    full_match_pages = {url: data for url, data in page_scores.items() if len(data['positions']) == len(valid_words)}
-    partial_match_pages = {url: data for url, data in page_scores.items() if len(data['positions']) < len(valid_words)}
+    # Sort pages based on count of valid words and position in the page
+    def sort_key(item):
+        url, data = item
+        positions = data['positions']
+        sequences = sum(1 for i in range(len(positions) - 1) if positions[i + 1] == positions[i] + 1)
+        return (-data['count'], -sequences, positions[0] if positions else float('inf'))
 
-    # Check for consecutive words and calculate positions
-    for url, data in full_match_pages.items():
-        flat_positions = [pos for sublist in data['positions'] for pos in sublist]
-        flat_positions.sort()
-        for i in range(len(flat_positions) - len(valid_words) + 1):
-            if flat_positions[i:i + len(valid_words)] == list(range(flat_positions[i], flat_positions[i] + len(valid_words))):
-                data['consecutive'] = True
-                break
-
-    def score_page(data):
-        # Primary sort by number of words matched (count)
-        # Secondary sort by frequency of words
-        # Tertiary sort by consecutive words
-        # Quaternary sort by first position
-        return (
-            len(data['positions']) == len(valid_words),  # all words present
-            data['consecutive'],  # consecutive words
-            data['count'],  # word frequency
-            -data['first_position']  # first position (negated for ascending order)
-        )
-
-    # Sort full match pages by score and positions
-    sorted_full_match_pages = sorted(full_match_pages.items(), key=lambda item: score_page(item[1]), reverse=True)
-    sorted_partial_match_pages = sorted(partial_match_pages.items(), key=lambda item: score_page(item[1]), reverse=True)
-
-    # Concatenate sorted results
-    sorted_pages = sorted_full_match_pages + sorted_partial_match_pages
+    sorted_pages = sorted(page_scores.items(), key=sort_key)
 
     if sorted_pages:
         print(f"Pages containing '{' '.join(valid_words)}':")
         for page, data in sorted_pages:
-            print(f"  - {page}")
+            sequences = sum(1 for i in range(len(data['positions']) - 1) if data['positions'][i + 1] == data['positions'][i] + 1)
+            print(f"  - {page} (count: {data['count']}, sequences: {sequences})")
     else:
         print(f"No pages found containing the phrase '{phrase}'.")
 
+
+
+def print_index(word, index):
+    word = word.lower()
+    if word in index:
+        pages = index[word]
+        sorted_pages = sorted(pages.items(), key=lambda item: (-len(item[1]), item[1][0]))
+        print(f"Inverted index for '{word}':")
+        for url, positions in sorted_pages:
+            print(f"  - {url} ({len(positions)} occurrences at positions {positions})")
+    else:
+        print("The 'print' command only supports single words, not phrases. Use 'find' for phrases.")
 
 def clear_index(file_path):
     if os.path.exists(file_path):
@@ -183,7 +158,7 @@ def print_usage():
     print("Available commands:")
     print("  build             - Crawl the website, build the index, and save it to index.json.")
     print("  load              - Load the index from index.json.")
-    print("  print <word>      - Print the inverted index for a specific word.")
+    print("  print <word>      - Print the inverted index for a specific word. (Single words only)")
     print("  find <phrase>     - Find pages containing the specified phrase.")
     print("  exit              - Exit the program.")
 
