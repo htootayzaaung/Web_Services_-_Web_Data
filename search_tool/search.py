@@ -173,6 +173,7 @@ def find_pages(phrase, index):
     else:
         print(f"No pages found containing the phrase '{phrase}'.")
 
+
 def clear_index(file_path):
     if os.path.exists(file_path):
         os.remove(file_path)
