@@ -1,7 +1,7 @@
 import time
 import requests
 from bs4 import BeautifulSoup
-from collections import defaultdict, Counter
+from collections import defaultdict
 import json
 import os
 from urllib.parse import urljoin, urlparse, urldefrag
@@ -13,17 +13,14 @@ from nltk.corpus import stopwords
 STOP_WORDS = set(stopwords.words('english'))
 
 def normalize_url(url):
-    # Remove URL fragment and normalize
     url = urldefrag(url)[0]
     parsed_url = urlparse(url)
     normalized_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
-    # Ensure consistent trailing slash
     if normalized_url.endswith('/'):
         normalized_url = normalized_url[:-1]
     return normalized_url
 
 def clean_text(text):
-    # Strip leading and trailing whitespace and collapse multiple spaces
     return ' '.join(text.split())
 
 def crawl_website(start_url, delay=0, existing_urls=None):
@@ -88,14 +85,13 @@ def load_index(file_path):
     
     try:
         with open(file_path, 'r') as f:
-            index = json.load(f, object_hook=lambda d: defaultdict(list, d))  # Properly convert to defaultdict
+            index = json.load(f, object_hook=lambda d: defaultdict(list, d))
             print(f"Index loaded from {file_path}.")
             return index, "Loaded successfully"
     except (json.JSONDecodeError, ValueError) as e:
         print(f"Failed to decode {file_path} due to {str(e)}. Clearing its contents and initializing a new index.")
         clear_index(file_path)
         return defaultdict(lambda: defaultdict(list)), "Failed to load; initialized new index"
-
 
 def merge_indices(existing_index, new_index):
     for word, urls in new_index.items():
@@ -131,22 +127,19 @@ def find_pages(phrase, index):
                 page_scores[url]['count'] += len(positions)
                 page_scores[url]['positions'].append(positions)
 
-    # Separate pages into those containing all words and those that don't
     full_match_pages = {url: data for url, data in page_scores.items() if len(data['positions']) == len(valid_words)}
     partial_match_pages = {url: data for url, data in page_scores.items() if len(data['positions']) < len(valid_words)}
 
-    # Sort full match pages based on frequency and position proximity
     def score_page(data):
         total_score = data['count']
         for positions in data['positions']:
             if all(abs(positions[i] - positions[i-1]) == 1 for i in range(1, len(positions))):
-                total_score += 1000  # High score for consecutive words
+                total_score += 1000
         return total_score
 
     sorted_full_match_pages = sorted(full_match_pages.items(), key=lambda item: score_page(item[1]), reverse=True)
     sorted_partial_match_pages = sorted(partial_match_pages.items(), key=lambda item: item[1]['count'], reverse=True)
 
-    # Combine results
     sorted_pages = sorted_full_match_pages + sorted_partial_match_pages
 
     if sorted_pages:
@@ -169,11 +162,27 @@ def print_usage():
     print("  find <phrase>     - Find pages containing the specified phrase.")
     print("  exit              - Exit the program.")
 
+def test_crawl_and_index():
+    start_url = "https://quotes.toscrape.com"
+    print("Starting the build process...")
+    index_file = 'index.json'
+    clear_index(index_file)
+
+    pages = crawl_website(start_url, delay=0)
+    index = build_inverted_index(pages)
+    save_index(index, index_file)
+
+    unique_urls = {url for url, _ in pages}
+    expected_page_count = 214
+    assert len(unique_urls) == expected_page_count, f"Expected {expected_page_count} pages, but got {len(unique_urls)}"
+
+    print(f"Indexed {len(unique_urls)} pages.")
+
 def main():
     index = None
     index_file = 'index.json'
 
-    print_usage()  # Print usage instructions initially
+    print_usage()
 
     while True:
         command = input("\nEnter a command: ").strip().lower()
@@ -190,6 +199,8 @@ def main():
                 new_index = build_inverted_index(pages)
                 index = merge_indices(existing_index, new_index)
                 save_index(index, index_file)
+                unique_urls = {url for url, _ in pages}
+                print(f"Indexed {len(unique_urls)} pages.")
         elif command == 'load':
             index, message = load_index(index_file)
             print(message)
@@ -217,7 +228,7 @@ def main():
         else:
             print("Invalid command.")
 
-        print_usage()  # Print usage instructions after each command
+        print_usage()
 
 if __name__ == "__main__":
     main()
