@@ -110,7 +110,6 @@ def find_pages(phrase, index):
         print(f"No pages found containing the phrase '{phrase}'.")
         return
 
-    # Collect pages and positions for each word
     page_scores = defaultdict(lambda: {'count': 0, 'positions': []})
 
     for word in valid_words:
@@ -119,7 +118,6 @@ def find_pages(phrase, index):
                 page_scores[url]['count'] += len(positions)
                 page_scores[url]['positions'].extend(positions)
 
-    # Sort pages based on count of valid words and position in the page
     def sort_key(item):
         url, data = item
         positions = data['positions']
@@ -132,22 +130,25 @@ def find_pages(phrase, index):
         print(f"Pages containing '{' '.join(valid_words)}':")
         for page, data in sorted_pages:
             sequences = sum(1 for i in range(len(data['positions']) - 1) if data['positions'][i + 1] == data['positions'][i] + 1)
-            print(f"  - {page} (count: {data['count']}, sequences: {sequences})")
+            print(f"  - {page}\n    (count: {data['count']}, positions: {data['positions']})")
     else:
         print(f"No pages found containing the phrase '{phrase}'.")
-
 
 
 def print_index(word, index):
     word = word.lower()
     if word in index:
-        pages = index[word]
-        sorted_pages = sorted(pages.items(), key=lambda item: (-len(item[1]), item[1][0]))
         print(f"Inverted index for '{word}':")
-        for url, positions in sorted_pages:
-            print(f"  - {url} ({len(positions)} occurrences at positions {positions})")
+        
+        # Extract and sort entries by count and position
+        entries = [(url, positions) for url, positions in index[word].items()]
+        sorted_entries = sorted(entries, key=lambda item: (-len(item[1]), item[1][0]))
+
+        for url, positions in sorted_entries:
+            print(f"  - {url}\n    (count: {len(positions)}, positions: {positions})")
     else:
-        print("The 'print' command only supports single words, not phrases. Use 'find' for phrases.")
+        print(f"No entries found for '{word}'. The 'print' command only supports single words, not phrases. Use 'find' for phrases.")
+
 
 def clear_index(file_path):
     if os.path.exists(file_path):
