@@ -86,7 +86,7 @@ def load_index(file_path):
     try:
         with open(file_path, 'r') as f:
             index = json.load(f, object_hook=lambda d: defaultdict(list, d))
-            return index, "Loaded successfully", True
+            return index, "Loaded successfully!", True
     except (json.JSONDecodeError, ValueError) as e:
         clear_index(file_path)
         return defaultdict(lambda: defaultdict(list)), "Failed to load; initialized new index", False
@@ -190,7 +190,7 @@ def find_pages(phrase, index):
         ))
         print(f"Pages containing '{phrase}':")
         for page, data in phrase_results:
-            print(f"  - {page}\n    │\n    └──('{phrase}' count: {data['phrase_count']}, positions: {data['phrase_positions']})")
+            print(f"  - {page}\n    │\n    └──('{phrase}' count: {data['phrase_count']}, positions: {data['phrase_positions']})\n")
 
     # Sort and print consecutive results
     if consecutive_results and len(valid_words) >= 3:
@@ -198,7 +198,7 @@ def find_pages(phrase, index):
         for page, data in consecutive_results:
             for pair, count in data['consecutive_counts'].items():
                 if count > 0:
-                    print(f"  - {page}\n    │\n    └──('{pair}' count: {count}, positions: {data['consecutive_positions'][pair]})")
+                    print(f"  - {page}\n    │\n    └──('{pair}' count: {count}, positions: {data['consecutive_positions'][pair]})\n")
 
     # Sort and print individual word results
     if individual_results:
@@ -212,7 +212,7 @@ def find_pages(phrase, index):
                 continue
             if data['count'] > 0:
                 word_count_details = ", ".join([f"{word}: {data['individual_counts'][word]}, positions: {data['positions'][word]}" for word in valid_words])
-                print(f"  - {page}\n    │\n    └──(total count: {data['count']}, {word_count_details})")
+                print(f"  - {page}\n    │\n    └──(total count: {data['count']}, {word_count_details})\n")
 
 def print_index(word, index):
     word = word.lower()
