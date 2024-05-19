@@ -81,18 +81,15 @@ def save_index(index, file_path):
 
 def load_index(file_path):
     if not os.path.exists(file_path):
-        print(f"{file_path} does not exist. Initializing an empty index.")
-        return defaultdict(lambda: defaultdict(list)), "Initialized empty index"
+        return defaultdict(lambda: defaultdict(list)), "Initialized empty index", False
     
     try:
         with open(file_path, 'r') as f:
             index = json.load(f, object_hook=lambda d: defaultdict(list, d))
-            print(f"Index loaded from {file_path}.")
-            return index, "Loaded successfully"
+            return index, "Loaded successfully", True
     except (json.JSONDecodeError, ValueError) as e:
-        print(f"Failed to decode {file_path} due to {str(e)}. Clearing its contents and initializing a new index.")
         clear_index(file_path)
-        return defaultdict(lambda: defaultdict(list)), "Failed to load; initialized new index"
+        return defaultdict(lambda: defaultdict(list)), "Failed to load; initialized new index", False
 
 def merge_indices(existing_index, new_index):
     for word, urls in new_index.items():
@@ -217,7 +214,6 @@ def find_pages(phrase, index):
                 word_count_details = ", ".join([f"{word}: {data['individual_counts'][word]}, positions: {data['positions'][word]}" for word in valid_words])
                 print(f"  - {page}\n    │\n    └──(total count: {data['count']}, {word_count_details})")
 
-
 def print_index(word, index):
     word = word.lower()
     if word in index:
@@ -273,19 +269,28 @@ def main():
         if command == 'build':
             start_url = "https://quotes.toscrape.com"
             print("Starting the build process...")
-            existing_index, _ = load_index(index_file)
-            existing_urls = {url for urls in existing_index.values() for url in urls}
-            pages = crawl_website(start_url, delay=0, existing_urls=existing_urls)
-            if not pages:
-                print("No new pages found. Index remains unchanged.")
+            existing_index, load_message, success = load_index(index_file)
+            if success:
+                print(load_message)
+                existing_urls = {url for urls in existing_index.values() for url in urls}
+                pages = crawl_website(start_url, delay=0, existing_urls=existing_urls)
+                if not pages:
+                    print("No new pages found. Index remains unchanged.")
+                else:
+                    new_index = build_inverted_index(pages)
+                    index = merge_indices(existing_index, new_index)
+                    save_index(index, index_file)
+                    unique_urls = {url for url, _ in pages}
+                    print(f"Indexed {len(unique_urls)} pages.")
             else:
-                new_index = build_inverted_index(pages)
-                index = merge_indices(existing_index, new_index)
+                print("Starting a fresh build...")
+                pages = crawl_website(start_url, delay=0)
+                index = build_inverted_index(pages)
                 save_index(index, index_file)
                 unique_urls = {url for url, _ in pages}
                 print(f"Indexed {len(unique_urls)} pages.")
         elif command == 'load':
-            index, message = load_index(index_file)
+            index, message, _ = load_index(index_file)
             print(message)
         elif command.startswith('print'):
             if index is None:
